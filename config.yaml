@@ -1,0 +1,6 @@
+rest: true
+static:
+  urlPath: '/akamai/'
+  files: 'akamai/*.html'
+jsResource:
+  files: './resources.js'
