@@ -41,7 +41,7 @@ async function getLatestMetric(metricName) {
   return null;
 }
 
-//computtes a weighted load score from analytics metrics
+//computes a weighted load score from analytics metrics
 async function computeLoadFromAnalytics() {
   const utilRow = CONFIG.metrics.has('threads') ? await getLatestMetric('utilization') : null;
   const cpuRow = CONFIG.metrics.has('cpu') ? await getLatestMetric('resource-usage') : null;
