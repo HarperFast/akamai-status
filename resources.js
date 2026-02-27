@@ -1,4 +1,4 @@
-const { hdb_status, hdb_analytics } = databases.system;
+const { hdb_analytics } = databases.system;
 
 //constants
 const DEFAULT_200_MSG = 'Status endpoint is reporting for duty.';
@@ -49,7 +49,7 @@ async function computeLoad() {
 
 /**
  * GET /status
- * Returns HTTP 200 when system status is "Ready", 404 otherwise.
+ * Returns HTTP 200 when system status is "Available", 404 otherwise.
  */
 export class status extends Resource {
   allowRead() {
@@ -57,9 +57,9 @@ export class status extends Resource {
   }
 
   async get() {
-    const record = await hdb_status.get('primary');
+    const record = await server.operation({ operation: 'get_status', id: 'availability' });
 
-    if (record?.status === 'Ready') {
+    if (record?.status === 'Available') {
       return DEFAULT_200_MSG;
     }
 
