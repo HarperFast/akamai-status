@@ -22,21 +22,25 @@ let loadCache = {
 
 //returns the most recent utilization for this node
 async function getUtilization() {
-	const nodeName = server.config.replication?.hostname;
-	if (!nodeName) return null;
+  const nodeName = server.config.replication?.hostname;
+  if (!nodeName) return null;
 
-	const results = await server.operation({
-		operation: 'get_analytics',
-		metric: 'utilization',
-		start_time: Date.now() - 120000,
-	});
+  const results = await server.operation({
+    operation: 'get_analytics',
+    metric: 'utilization',
+    start_time: Date.now() - 120000,
+  });
 
-	const all = await Promise.all([...results]);
-	const local = all
-		.filter((r) => r.node === nodeName)
-		.sort((a, b) => b.id - a.id)[0];
+  let latest = null;
+  for await (const record of results) {
+    if (record.node === nodeName) {
+      if (!latest || record.id > latest.id) {
+        latest = record;
+      }
+    }
+  }
 
-	return local ? Number(local.utilization) || 0 : null;
+  return latest ? Number(latest.utilization) || 0 : null;
 }
 
 //computes load score from thread utilization
