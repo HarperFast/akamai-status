@@ -77,6 +77,20 @@ describe('current_load_for_gtm', () => {
 		server.config = {};
 	});
 
+	it('bounds the analytics query at both ends so core can pin the id range', async () => {
+		let request;
+		operationHandler = (received) => {
+			request = received;
+			return asyncIterable(analyticsRows());
+		};
+
+		await new current_load_for_gtm().get();
+
+		assert.equal(typeof request.end_time, 'number');
+		// Default aggregatePeriod of 60s -> a 120s window.
+		assert.equal(request.end_time - request.start_time, 120_000);
+	});
+
 	it('reports max load when this node has no analytics rows', async () => {
 		operationHandler = () => asyncIterable([utilizationRow('node-b', 3, 0.9)]);
 

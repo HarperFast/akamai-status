@@ -8,17 +8,18 @@ const CONFIG = {
 	max: Number(cfg.loadThresholds?.max ?? cfg.loadThresholds?.scale ?? 1000),
 	prefix: 'load:',
 	cacheTtl: 2000,
-	// The window must span at least one analytics aggregation period (60s by default) or a
-	// node that just aggregated will look like it has no data at all.
-	utilizationWindow: 120000,
+	// Two aggregation periods, so a node that has just aggregated still has a row in range.
+	// Derived rather than hard-coded: an operator raising analytics.aggregatePeriod past a fixed
+	// window would otherwise push every node to max load permanently.
+	utilizationWindow: Math.max(2000 * Number(server.config?.analytics?.aggregatePeriod ?? 60), 120000),
 };
 
 let cachedLoad = null;
 let cachedAt = 0;
 let pendingLoad = null;
 
-// Reporting max load takes a node out of GTM rotation, so a silent failure here is an outage
-// with no signal. GTM polls continuously, so log the transition rather than every poll.
+// Reporting max load takes a node out of GTM rotation, so log the transition — GTM polls
+// continuously, and a per-poll line would bury the one an operator needs.
 let degradedReason = null;
 
 function reportMaxLoad(reason) {
@@ -37,14 +38,18 @@ function clearDegraded() {
 }
 
 async function getUtilization() {
-	// `server.hostname` is the node identity analytics rows are attributed to; `replication.hostname`
-	// is only one of the fallbacks it resolves through and can be unset.
+	// The identity analytics rows are attributed to; `replication.hostname` is only one of the
+	// fallbacks it resolves through and can be unset.
 	const nodeName = server.hostname;
 
+	// Both bounds are set so core can pin the primary-key range; a one-sided range leaves the
+	// planner free to drive off `metric equals` and decode the metric's whole retained history.
+	const now = Date.now();
 	const results = await server.operation({
 		operation: 'get_analytics',
 		metric: 'utilization',
-		start_time: Date.now() - CONFIG.utilizationWindow,
+		start_time: now - CONFIG.utilizationWindow,
+		end_time: now,
 	});
 
 	let latest = null;
@@ -66,7 +71,10 @@ async function computeLoad() {
 	}
 
 	if (utilization === null) {
-		return reportMaxLoad('no utilization analytics for this node (expected briefly after a restart)');
+		return reportMaxLoad(
+			'no utilization analytics for this node — expected for one aggregation period after a restart, ' +
+				'otherwise check that analytics are being written and that node.hostname matches this node'
+		);
 	}
 
 	clearDegraded();
@@ -76,7 +84,6 @@ async function computeLoad() {
 
 function getLoad() {
 	if (cachedLoad !== null && Date.now() - cachedAt <= CONFIG.cacheTtl) return cachedLoad;
-	// One in-flight computation is shared so a burst of polls costs a single analytics scan.
 	pendingLoad ??= computeLoad().then(
 		(value) => {
 			cachedLoad = value;

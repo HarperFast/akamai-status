@@ -31,8 +31,9 @@ curl http://localhost:9926/status
 
 ### POST /status, DELETE /status
 
-Sets this node Available (`POST`) or Unavailable (`DELETE`). Both are authenticated; an unauthenticated
-request is rejected with `401`.
+Sets this node Available (`POST`) or Unavailable (`DELETE`). Both require a `super_user` — they inherit
+Harper's default `allowCreate`/`allowDelete`, so a role granted only the `set_status` _operation_ can use
+the operations API below but not these routes. An unauthenticated request is rejected with `401`.
 
 ```shell
 curl -X DELETE http://localhost:9926/status --header "Authorization: Basic $AUTH"
@@ -66,7 +67,10 @@ resolution of this endpoint is that period, not the 2s response cache.
 
 If utilization data is unavailable or the query fails, the endpoint reports max load, which takes the node
 out of GTM rotation. That is expected for up to one aggregation period after a restart; entering and
-leaving this state is logged at `warn`.
+leaving this state is logged at `warn`, once per episode rather than once per poll.
+
+The lookback window is two aggregation periods (minimum 120s), so raising `analytics.aggregatePeriod`
+does not strand the endpoint at max load.
 
 ### GET /akamai/sureroute-test-object.html
 
