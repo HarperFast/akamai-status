@@ -36,7 +36,8 @@
 		"access": "public"
 	},
 	"scripts": {
-		"format": "prettier --write ."
+		"format": "prettier --write .",
+		"test": "node --test resources.test.js"
 	},
 	"devDependencies": {
 		"@harperdb/code-guidelines": "^0.0.2",

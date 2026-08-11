@@ -62,8 +62,7 @@ async function computeLoad() {
 	try {
 		utilization = await getUtilization();
 	} catch (error) {
-		logger.warn('akamai-status: get_analytics failed', error);
-		return reportMaxLoad('utilization query failed');
+		return reportMaxLoad(`utilization query failed: ${error?.message ?? error}`);
 	}
 
 	if (utilization === null) {
@@ -77,7 +76,7 @@ async function computeLoad() {
 
 function getLoad() {
 	if (cachedLoad !== null && Date.now() - cachedAt <= CONFIG.cacheTtl) return cachedLoad;
-	// Share one in-flight computation so a burst of polls costs a single analytics scan.
+	// One in-flight computation is shared so a burst of polls costs a single analytics scan.
 	pendingLoad ??= computeLoad().then(
 		(value) => {
 			cachedLoad = value;
@@ -87,8 +86,7 @@ function getLoad() {
 		},
 		(error) => {
 			pendingLoad = null;
-			logger.warn('akamai-status: load computation failed', error);
-			return CONFIG.max;
+			return reportMaxLoad(`load computation failed: ${error?.message ?? error}`);
 		}
 	);
 	return pendingLoad;

@@ -31,8 +31,8 @@ curl http://localhost:9926/status
 
 ### POST /status, DELETE /status
 
-Sets this node Available (`POST`) or Unavailable (`DELETE`). Both are authenticated — the user must be a
-superuser or hold permission for the `set_status` operation.
+Sets this node Available (`POST`) or Unavailable (`DELETE`). Both are authenticated; an unauthenticated
+request is rejected with `401`.
 
 ```shell
 curl -X DELETE http://localhost:9926/status --header "Authorization: Basic $AUTH"
