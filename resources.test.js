@@ -29,7 +29,6 @@ function utilizationRow(node, id, utilization) {
 	return { node, id, utilization, metric: 'utilization' };
 }
 
-// Default: two nodes reporting, this node's newest row last so ordering is actually exercised.
 function analyticsRows() {
 	return [utilizationRow('node-b', 3, 0.9), utilizationRow('node-a', 1, 0.1), utilizationRow('node-a', 2, 0.25)];
 }
@@ -47,7 +46,6 @@ async function startHealthy() {
 	warnings.length = 0;
 }
 
-// The module caches load for 2s; advancing the clock is how a test gets a fresh computation.
 let now = 1_000_000;
 const realDateNow = Date.now;
 
@@ -171,11 +169,12 @@ describe('current_load_for_gtm', () => {
 		};
 
 		await new current_load_for_gtm().get();
-		now += 1_000;
+		// Past the old fixed 2s TTL but inside the derived one (half of a 60s aggregation period).
+		now += 20_000;
 		await new current_load_for_gtm().get();
 		assert.equal(queries, 1);
 
-		now += 60_000;
+		now += 20_000;
 		await new current_load_for_gtm().get();
 		assert.equal(queries, 2);
 	});

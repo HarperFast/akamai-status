@@ -3,6 +3,10 @@ const DEFAULT_404_MSG = 'Status endpoint is reporting downtime.';
 
 const cfg = server.config?.akamaiStatus ?? {};
 
+// A non-numeric configured value would otherwise produce NaN bounds, which match no rows and pin
+// the node at max load.
+const aggregatePeriodSeconds = Number(server.config?.analytics?.aggregatePeriod) || 60;
+
 const CONFIG = {
 	scale: Number(cfg.loadThresholds?.scale ?? 1000),
 	max: Number(cfg.loadThresholds?.max ?? cfg.loadThresholds?.scale ?? 1000),
@@ -10,11 +14,11 @@ const CONFIG = {
 	// Half an aggregation period: the underlying metric only moves once per period, so a shorter
 	// TTL just re-runs the scan — and `node` is resolved per row by an awaited table get in core,
 	// so each scan is proportional to the cluster's row count, not free.
-	cacheTtl: Math.max(500 * Number(server.config?.analytics?.aggregatePeriod ?? 60), 2000),
+	cacheTtl: Math.max(500 * aggregatePeriodSeconds, 2000),
 	// Two aggregation periods, so a node that has just aggregated still has a row in range.
 	// Derived rather than hard-coded: an operator raising analytics.aggregatePeriod past a fixed
 	// window would otherwise push every node to max load permanently.
-	utilizationWindow: Math.max(2000 * Number(server.config?.analytics?.aggregatePeriod ?? 60), 120000),
+	utilizationWindow: Math.max(2000 * aggregatePeriodSeconds, 120000),
 };
 
 let cachedLoad = null;
