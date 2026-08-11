@@ -42,7 +42,7 @@ async function* asyncIterable(rows) {
 // warning counts has to start from a known-healthy state rather than whatever ran before it.
 async function startHealthy() {
 	operationHandler = () => asyncIterable(analyticsRows());
-	now += 10_000;
+	now += 60_000;
 	await new current_load_for_gtm().get();
 	warnings.length = 0;
 }
@@ -54,7 +54,7 @@ const realDateNow = Date.now;
 describe('current_load_for_gtm', () => {
 	beforeEach(() => {
 		warnings.length = 0;
-		now += 10_000;
+		now += 60_000;
 		Date.now = () => now;
 	});
 
@@ -112,7 +112,22 @@ describe('current_load_for_gtm', () => {
 		};
 
 		for (let poll = 0; poll < 5; poll++) {
-			now += 10_000;
+			now += 60_000;
+			await new current_load_for_gtm().get();
+		}
+
+		assert.equal(warnings.length, 1, `expected one warning, got ${warnings.length}: ${warnings.join(' | ')}`);
+	});
+
+	it('treats one wedged-analytics episode as one episode even as the error text varies', async () => {
+		await startHealthy();
+		let attempt = 0;
+		operationHandler = () => {
+			throw new Error(`timed out after ${attempt++}ms`);
+		};
+
+		for (let poll = 0; poll < 5; poll++) {
+			now += 60_000;
 			await new current_load_for_gtm().get();
 		}
 
@@ -124,10 +139,10 @@ describe('current_load_for_gtm', () => {
 		operationHandler = () => {
 			throw new Error('boom');
 		};
-		now += 10_000;
+		now += 60_000;
 		await new current_load_for_gtm().get();
 
-		now += 10_000;
+		now += 60_000;
 		operationHandler = () => asyncIterable(analyticsRows());
 		assert.equal(await new current_load_for_gtm().get(), 'load:250');
 
@@ -160,7 +175,7 @@ describe('current_load_for_gtm', () => {
 		await new current_load_for_gtm().get();
 		assert.equal(queries, 1);
 
-		now += 5_000;
+		now += 60_000;
 		await new current_load_for_gtm().get();
 		assert.equal(queries, 2);
 	});

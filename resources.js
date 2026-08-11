@@ -7,7 +7,10 @@ const CONFIG = {
 	scale: Number(cfg.loadThresholds?.scale ?? 1000),
 	max: Number(cfg.loadThresholds?.max ?? cfg.loadThresholds?.scale ?? 1000),
 	prefix: 'load:',
-	cacheTtl: 2000,
+	// Half an aggregation period: the underlying metric only moves once per period, so a shorter
+	// TTL just re-runs the scan — and `node` is resolved per row by an awaited table get in core,
+	// so each scan is proportional to the cluster's row count, not free.
+	cacheTtl: Math.max(500 * Number(server.config?.analytics?.aggregatePeriod ?? 60), 2000),
 	// Two aggregation periods, so a node that has just aggregated still has a row in range.
 	// Derived rather than hard-coded: an operator raising analytics.aggregatePeriod past a fixed
 	// window would otherwise push every node to max load permanently.
@@ -22,10 +25,12 @@ let pendingLoad = null;
 // continuously, and a per-poll line would bury the one an operator needs.
 let degradedReason = null;
 
-function reportMaxLoad(reason) {
-	if (reason !== degradedReason) {
-		degradedReason = reason;
-		logger.warn(`akamai-status: reporting max load (${CONFIG.max}) for GTM — ${reason}`);
+// Keyed on a stable code, not the logged text: interpolating an error message would make every
+// refresh of one wedged-analytics episode look like a new episode and warn again.
+function reportMaxLoad(code, detail) {
+	if (code !== degradedReason) {
+		degradedReason = code;
+		logger.warn(`akamai-status: reporting max load (${CONFIG.max}) for GTM — ${detail}`);
 	}
 	return CONFIG.max;
 }
@@ -38,8 +43,8 @@ function clearDegraded() {
 }
 
 async function getUtilization() {
-	// The identity analytics rows are attributed to; `replication.hostname` is only one of the
-	// fallbacks it resolves through and can be unset.
+	// The identity analytics rows are attributed to. `replication.hostname` is only one of the
+	// fallbacks core resolves it through, and can be unset.
 	const nodeName = server.hostname;
 
 	// Both bounds are set so core can pin the primary-key range; a one-sided range leaves the
@@ -67,7 +72,7 @@ async function computeLoad() {
 	try {
 		utilization = await getUtilization();
 	} catch (error) {
-		return reportMaxLoad(`utilization query failed: ${error?.message ?? error}`);
+		return reportMaxLoad('analytics-query-failed', `utilization query failed: ${error?.message ?? error}`);
 	}
 
 	if (utilization === null) {
@@ -93,7 +98,7 @@ function getLoad() {
 		},
 		(error) => {
 			pendingLoad = null;
-			return reportMaxLoad(`load computation failed: ${error?.message ?? error}`);
+			return reportMaxLoad('load-computation-failed', `load computation failed: ${error?.message ?? error}`);
 		}
 	);
 	return pendingLoad;

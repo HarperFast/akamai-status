@@ -62,8 +62,9 @@ curl http://localhost:9926/current_load_for_gtm
 Response format is `load:N` where N is `utilization × scale`, capped at `max`.
 
 The underlying `utilization` metric is the mean event-loop utilization across worker threads, aggregated
-once per analytics aggregation period (`analytics.aggregatePeriod`, 60s by default) — so the effective
-resolution of this endpoint is that period, not the 2s response cache.
+once per analytics aggregation period (`analytics.aggregatePeriod`, 60s by default). The response cache
+and the lookback window are both derived from that period, so the endpoint neither re-scans for a value
+that has not moved nor misses one that has.
 
 If utilization data is unavailable or the query fails, the endpoint reports max load, which takes the node
 out of GTM rotation. That is expected for up to one aggregation period after a restart; entering and
