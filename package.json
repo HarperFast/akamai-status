@@ -25,6 +25,16 @@
 		"url": "git+https://github.com/HarperFast/akamai-status.git"
 	},
 	"license": "Apache-2.0",
+	"files": [
+		"akamai",
+		"config.yaml",
+		"resources.js",
+		"README.md",
+		"LICENSE"
+	],
+	"publishConfig": {
+		"access": "public"
+	},
 	"scripts": {
 		"format": "prettier --write ."
 	},
