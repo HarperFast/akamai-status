@@ -1,60 +1,112 @@
-//constants
 const DEFAULT_200_MSG = 'Status endpoint is reporting for duty.';
 const DEFAULT_404_MSG = 'Status endpoint is reporting downtime.';
 
-//config
 const cfg = server.config?.akamaiStatus ?? {};
+
+// A non-numeric configured value would otherwise produce NaN bounds, which match no rows and pin
+// the node at max load.
+const aggregatePeriodSeconds = Number(server.config?.analytics?.aggregatePeriod) || 60;
 
 const CONFIG = {
 	scale: Number(cfg.loadThresholds?.scale ?? 1000),
 	max: Number(cfg.loadThresholds?.max ?? cfg.loadThresholds?.scale ?? 1000),
 	prefix: 'load:',
-	cacheTtl: 2000,
+	// Half an aggregation period: the underlying metric only moves once per period, so a shorter
+	// TTL just re-runs the scan — and `node` is resolved per row by an awaited table get in core,
+	// so each scan is proportional to the cluster's row count, not free.
+	cacheTtl: Math.max(500 * aggregatePeriodSeconds, 2000),
+	// Two aggregation periods, so a node that has just aggregated still has a row in range.
+	// Derived rather than hard-coded: an operator raising analytics.aggregatePeriod past a fixed
+	// window would otherwise push every node to max load permanently.
+	utilizationWindow: Math.max(2000 * aggregatePeriodSeconds, 120000),
 };
 
-//cache for load value
-let loadCache = {
-	value: null,
-	ts: 0,
-};
+let cachedLoad = null;
+let cachedAt = 0;
+let pendingLoad = null;
 
-//helpers
+// Reporting max load takes a node out of GTM rotation, so log the transition — GTM polls
+// continuously, and a per-poll line would bury the one an operator needs.
+let degradedReason = null;
 
-//returns the most recent utilization for this node
-async function getUtilization() {
-  const nodeName = server.config.replication?.hostname;
-  if (!nodeName) return null;
-
-  const results = await server.operation({
-    operation: 'get_analytics',
-    metric: 'utilization',
-    start_time: Date.now() - 120000,
-  });
-
-  let latest = null;
-  for await (const record of results) {
-    if (record.node === nodeName) {
-      if (!latest || record.id > latest.id) {
-        latest = record;
-      }
-    }
-  }
-
-  return latest ? Number(latest.utilization) || 0 : null;
+// Keyed on a stable code, not the logged text: interpolating an error message would make every
+// refresh of one wedged-analytics episode look like a new episode and warn again.
+function reportMaxLoad(code, detail) {
+	if (code !== degradedReason) {
+		degradedReason = code;
+		logger.warn(`akamai-status: reporting max load (${CONFIG.max}) for GTM — ${detail}`);
+	}
+	return CONFIG.max;
 }
 
-//computes load score from thread utilization
+function clearDegraded() {
+	if (degradedReason) {
+		logger.warn(`akamai-status: load feedback recovered, resuming measured load`);
+		degradedReason = null;
+	}
+}
+
+async function getUtilization() {
+	// The identity analytics rows are attributed to. `replication.hostname` is only one of the
+	// fallbacks core resolves it through, and can be unset.
+	const nodeName = server.hostname;
+
+	// Both bounds are set so core can pin the primary-key range; a one-sided range leaves the
+	// planner free to drive off `metric equals` and decode the metric's whole retained history.
+	const now = Date.now();
+	const results = await server.operation({
+		operation: 'get_analytics',
+		metric: 'utilization',
+		start_time: now - CONFIG.utilizationWindow,
+		end_time: now,
+	});
+
+	let latest = null;
+	for await (const record of results) {
+		if (record.node === nodeName && (!latest || record.id > latest.id)) {
+			latest = record;
+		}
+	}
+
+	return latest ? Number(latest.utilization) || 0 : null;
+}
+
 async function computeLoad() {
-	const utilization = await getUtilization();
+	let utilization;
+	try {
+		utilization = await getUtilization();
+	} catch (error) {
+		return reportMaxLoad('analytics-query-failed', `utilization query failed: ${error?.message ?? error}`);
+	}
 
-	//no data = max load
-	if (utilization === null) return CONFIG.max;
+	if (utilization === null) {
+		return reportMaxLoad(
+			'no utilization analytics for this node — expected for one aggregation period after a restart, ' +
+				'otherwise check that analytics are being written and that node.hostname matches this node'
+		);
+	}
 
+	clearDegraded();
 	const scaled = Math.round(utilization * CONFIG.scale);
 	return Math.min(Math.max(scaled, 0), CONFIG.max);
 }
 
-//endpoints
+function getLoad() {
+	if (cachedLoad !== null && Date.now() - cachedAt <= CONFIG.cacheTtl) return cachedLoad;
+	pendingLoad ??= computeLoad().then(
+		(value) => {
+			cachedLoad = value;
+			cachedAt = Date.now();
+			pendingLoad = null;
+			return value;
+		},
+		(error) => {
+			pendingLoad = null;
+			return reportMaxLoad('load-computation-failed', `load computation failed: ${error?.message ?? error}`);
+		}
+	);
+	return pendingLoad;
+}
 
 /**
  * GET /status
@@ -76,6 +128,14 @@ export class status extends Resource {
 		err.statusCode = 404;
 		throw err;
 	}
+
+	async post() {
+		await server.operation({ operation: 'set_status', id: 'availability', status: 'Available' });
+	}
+
+	async delete() {
+		await server.operation({ operation: 'set_status', id: 'availability', status: 'Unavailable' });
+	}
 }
 
 /**
@@ -88,19 +148,6 @@ export class current_load_for_gtm extends Resource {
 	}
 
 	async get() {
-		const now = Date.now();
-
-		if (loadCache.value === null || now - loadCache.ts > CONFIG.cacheTtl) {
-			try {
-				loadCache.value = await computeLoad();
-				loadCache.ts = now;
-			} catch {
-				//return max load on error
-				loadCache.value = CONFIG.max;
-				loadCache.ts = now;
-			}
-		}
-
-		return `${CONFIG.prefix}${loadCache.value}`;
+		return `${CONFIG.prefix}${await getLoad()}`;
 	}
 }
