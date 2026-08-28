@@ -1,5 +1,5 @@
 {
-	"name": "@harperdb/akamai-status",
+	"name": "@harperfast/akamai-status",
 	"version": "1.0.0",
 	"type": "module",
 	"description": "A HarperFast component providing status, load feedback, and SureRoute endpoints for Akamai services",
