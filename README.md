@@ -1,4 +1,4 @@
-# @harperdb/akamai-status
+# @harperfast/akamai-status
 
 This component provides endpoints for Akamai services to determine Harper instance health, status, and load for traffic routing.
 
