@@ -3,15 +3,19 @@ const DEFAULT_404_MSG = 'Status endpoint is reporting downtime.';
 
 const cfg = server.config?.akamaiStatus ?? {};
 
-// A non-numeric configured value would otherwise produce NaN bounds, which match no rows and pin
-// the node at max load.
-const aggregatePeriodSeconds = Number(server.config?.analytics?.aggregatePeriod) || 60;
+//non-finite or non-positive config would turn loads and windows into NaN/Infinity
+function positiveNumber(value, fallback) {
+	const n = Number(value);
+	return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
+const aggregatePeriodSeconds = positiveNumber(server.config?.analytics?.aggregatePeriod, 60);
 
 const CONFIG = {
-	scale: Number(cfg.loadThresholds?.scale ?? 1000) || 1000,
-	max: Number(cfg.loadThresholds?.max ?? cfg.loadThresholds?.scale ?? 1000) || 1000,
-	//request rate that maps to full scale, set per instance size; guarded against non-numeric values
-	targetRps: Math.max(Number(cfg.loadThresholds?.targetRps) || 1000, 1),
+	scale: positiveNumber(cfg.loadThresholds?.scale, 1000),
+	max: positiveNumber(cfg.loadThresholds?.max ?? cfg.loadThresholds?.scale, 1000),
+	//request rate that maps to full scale, set per instance size
+	targetRps: positiveNumber(cfg.loadThresholds?.targetRps, 1000),
 	prefix: 'load:',
 	// Half an aggregation period: the underlying metric only moves once per period, so a shorter
 	// TTL just re-runs the scan — and `node` is resolved per row by an awaited table get in core,
