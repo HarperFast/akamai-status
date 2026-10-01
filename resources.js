@@ -177,6 +177,7 @@ export class current_load_for_gtm extends Resource {
 	}
 
 	async get() {
-		return `${CONFIG.prefix}${await getLoad()}`;
+		//explicit text content type, otherwise harper serializes the bare string to json and GTM's load: leader-string parse sees a quoted body
+		return { contentType: 'text/plain', data: `${CONFIG.prefix}${await getLoad()}` };
 	}
 }

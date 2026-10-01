@@ -56,10 +56,10 @@ Returns server load for Akamai GTM based on this node's HTTP request rate.
 
 ```shell
 curl http://localhost:9926/current_load_for_gtm
-# "load:200"
+# load:200
 ```
 
-Response format is `load:N` where N is `(requests per second ÷ targetRps) × scale`, capped at `max`.
+Response format is `load:N` where N is `(requests per second ÷ targetRps) × scale`, capped at `max`. The body is served as `text/plain`, unquoted, so GTM's `load:` leader-string parse works on the raw bytes.
 
 The rate is computed from the `success` analytics metric, which core records for every HTTP request and
 aggregates once per analytics aggregation period (`analytics.aggregatePeriod`, 60s by default). Request

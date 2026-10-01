@@ -47,12 +47,18 @@ async function* asyncIterable(rows) {
 	for (const row of rows) yield row;
 }
 
+//the endpoint returns {contentType, data} so harper sends plain text instead of json-quoting the string
+async function loadBody() {
+	const response = await new current_load_for_gtm().get();
+	return response.data;
+}
+
 // Degraded state is module-level and deliberately persists across polls, so a test that asserts
 // warning counts has to start from a known-healthy state rather than whatever ran before it.
 async function startHealthy() {
 	operationHandler = () => asyncIterable(analyticsRows());
 	now += 60_000;
-	await new current_load_for_gtm().get();
+	await loadBody();
 	warnings.length = 0;
 }
 
@@ -73,7 +79,15 @@ describe('current_load_for_gtm', () => {
 	it("sums this node's newest cycle across paths and methods, ignoring other nodes and older cycles", async () => {
 		operationHandler = () => asyncIterable(analyticsRows());
 
-		assert.equal(await new current_load_for_gtm().get(), 'load:200');
+		assert.equal(await loadBody(), 'load:200');
+	});
+
+	it("returns a plain text body so GTM's leader-string parse sees load:N unquoted", async () => {
+		operationHandler = () => asyncIterable(analyticsRows());
+
+		const response = await new current_load_for_gtm().get();
+		assert.equal(response.contentType, 'text/plain');
+		assert.match(response.data, /^load:\d+$/);
 	});
 
 	it('resolves the node from server.hostname, not replication.hostname', async () => {
@@ -81,7 +95,7 @@ describe('current_load_for_gtm', () => {
 		server.config = { replication: {} };
 		operationHandler = () => asyncIterable(analyticsRows());
 
-		assert.equal(await new current_load_for_gtm().get(), 'load:200');
+		assert.equal(await loadBody(), 'load:200');
 		server.config = {};
 	});
 
@@ -89,7 +103,7 @@ describe('current_load_for_gtm', () => {
 		//90,000 requests over 60s = 1,500 req/s against the default 1,000 target
 		operationHandler = () => asyncIterable([successRow('node-a', 200_000, 90_000)]);
 
-		assert.equal(await new current_load_for_gtm().get(), 'load:1000');
+		assert.equal(await loadBody(), 'load:1000');
 	});
 
 	it('falls back to the aggregation period when the row carries no period', async () => {
@@ -97,7 +111,7 @@ describe('current_load_for_gtm', () => {
 		delete row.period;
 		operationHandler = () => asyncIterable([row]);
 
-		assert.equal(await new current_load_for_gtm().get(), 'load:200');
+		assert.equal(await loadBody(), 'load:200');
 	});
 
 	it('bounds the analytics query at both ends so core can pin the id range', async () => {
@@ -107,7 +121,7 @@ describe('current_load_for_gtm', () => {
 			return asyncIterable(analyticsRows());
 		};
 
-		await new current_load_for_gtm().get();
+		await loadBody();
 
 		assert.equal(request.metric, 'success');
 		assert.equal(typeof request.end_time, 'number');
@@ -121,14 +135,14 @@ describe('current_load_for_gtm', () => {
 				? asyncIterable([successRow('node-b', 200_002, 999_999)])
 				: asyncIterable([resourceUsageRow('node-a', 200_000)]);
 
-		assert.equal(await new current_load_for_gtm().get(), 'load:0');
+		assert.equal(await loadBody(), 'load:0');
 		assert.equal(warnings.length, 0);
 	});
 
 	it('reports max load when this node has no analytics rows at all', async () => {
 		operationHandler = () => asyncIterable([successRow('node-b', 200_002, 999_999)]);
 
-		assert.equal(await new current_load_for_gtm().get(), 'load:1000');
+		assert.equal(await loadBody(), 'load:1000');
 		assert.equal(warnings.length, 1);
 		assert.match(warnings[0], /no analytics rows/);
 	});
@@ -138,7 +152,7 @@ describe('current_load_for_gtm', () => {
 			throw new Error('boom');
 		};
 
-		assert.equal(await new current_load_for_gtm().get(), 'load:1000');
+		assert.equal(await loadBody(), 'load:1000');
 	});
 
 	it('warns once per degraded episode, not once per poll', async () => {
@@ -149,7 +163,7 @@ describe('current_load_for_gtm', () => {
 
 		for (let poll = 0; poll < 5; poll++) {
 			now += 60_000;
-			await new current_load_for_gtm().get();
+			await loadBody();
 		}
 
 		assert.equal(warnings.length, 1, `expected one warning, got ${warnings.length}: ${warnings.join(' | ')}`);
@@ -164,7 +178,7 @@ describe('current_load_for_gtm', () => {
 
 		for (let poll = 0; poll < 5; poll++) {
 			now += 60_000;
-			await new current_load_for_gtm().get();
+			await loadBody();
 		}
 
 		assert.equal(warnings.length, 1, `expected one warning, got ${warnings.length}: ${warnings.join(' | ')}`);
@@ -176,11 +190,11 @@ describe('current_load_for_gtm', () => {
 			throw new Error('boom');
 		};
 		now += 60_000;
-		await new current_load_for_gtm().get();
+		await loadBody();
 
 		now += 60_000;
 		operationHandler = () => asyncIterable(analyticsRows());
-		assert.equal(await new current_load_for_gtm().get(), 'load:200');
+		assert.equal(await loadBody(), 'load:200');
 
 		assert.equal(warnings.length, 2);
 		assert.match(warnings[1], /recovered/);
@@ -193,7 +207,7 @@ describe('current_load_for_gtm', () => {
 			return asyncIterable(analyticsRows());
 		};
 
-		const results = await Promise.all(Array.from({ length: 10 }, () => new current_load_for_gtm().get()));
+		const results = await Promise.all(Array.from({ length: 10 }, () => loadBody()));
 
 		assert.equal(queries, 1);
 		assert.deepEqual(new Set(results), new Set(['load:200']));
@@ -206,14 +220,14 @@ describe('current_load_for_gtm', () => {
 			return asyncIterable(analyticsRows());
 		};
 
-		await new current_load_for_gtm().get();
+		await loadBody();
 		// Past the old fixed 2s TTL but inside the derived one (half of a 60s aggregation period).
 		now += 20_000;
-		await new current_load_for_gtm().get();
+		await loadBody();
 		assert.equal(queries, 1);
 
 		now += 20_000;
-		await new current_load_for_gtm().get();
+		await loadBody();
 		assert.equal(queries, 2);
 	});
 });
