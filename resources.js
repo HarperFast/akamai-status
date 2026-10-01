@@ -8,8 +8,8 @@ const cfg = server.config?.akamaiStatus ?? {};
 const aggregatePeriodSeconds = Number(server.config?.analytics?.aggregatePeriod) || 60;
 
 const CONFIG = {
-	scale: Number(cfg.loadThresholds?.scale ?? 1000),
-	max: Number(cfg.loadThresholds?.max ?? cfg.loadThresholds?.scale ?? 1000),
+	scale: Number(cfg.loadThresholds?.scale ?? 1000) || 1000,
+	max: Number(cfg.loadThresholds?.max ?? cfg.loadThresholds?.scale ?? 1000) || 1000,
 	// The request rate that maps to full scale. GTM compares reported loads across datacenters, so
 	// this anchors what fully loaded means for an instance; tune it per instance size. Guarded like
 	// aggregatePeriod above: a non-numeric or non-positive value would make every load NaN.
