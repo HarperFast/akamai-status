@@ -10,9 +10,7 @@ const aggregatePeriodSeconds = Number(server.config?.analytics?.aggregatePeriod)
 const CONFIG = {
 	scale: Number(cfg.loadThresholds?.scale ?? 1000) || 1000,
 	max: Number(cfg.loadThresholds?.max ?? cfg.loadThresholds?.scale ?? 1000) || 1000,
-	// The request rate that maps to full scale. GTM compares reported loads across datacenters, so
-	// this anchors what fully loaded means for an instance; tune it per instance size. Guarded like
-	// aggregatePeriod above: a non-numeric or non-positive value would make every load NaN.
+	//request rate that maps to full scale, set per instance size; guarded against non-numeric values
 	targetRps: Math.max(Number(cfg.loadThresholds?.targetRps) || 1000, 1),
 	prefix: 'load:',
 	// Half an aggregation period: the underlying metric only moves once per period, so a shorter
@@ -25,10 +23,8 @@ const CONFIG = {
 	analyticsWindow: Math.max(2000 * aggregatePeriodSeconds, 120000),
 };
 
-// One aggregation cycle stores its rows in a tight loop while successive cycles are at least half
-// an aggregation period apart, so this margin groups the newest cycle's rows without ever reaching
-// back into the previous cycle. Capped at a quarter period so a small configured aggregatePeriod
-// cannot bring the previous cycle inside the margin.
+//groups one cycle's rows, which are written in a tight loop; cycles are at least half a period apart
+//capped at a quarter period so a small aggregatePeriod can't pull in the previous cycle
 const CYCLE_MARGIN_MS = Math.min(5000, (aggregatePeriodSeconds * 1000) / 4);
 
 let cachedLoad = null;
@@ -57,8 +53,7 @@ function clearDegraded() {
 }
 
 function queryMetric(metric) {
-	// Both bounds are set so core can pin the primary-key range; a one-sided range leaves the
-	// planner free to drive off `metric equals` and decode the metric's whole retained history.
+	//both bounds set so core pins the primary-key range instead of decoding the metric's whole history
 	const now = Date.now();
 	return server.operation({
 		operation: 'get_analytics',
@@ -68,15 +63,12 @@ function queryMetric(metric) {
 	});
 }
 
-// Returns this node's HTTP request rate in requests per second from the newest aggregation cycle,
-// 0 for a healthy node that saw no requests, or null when analytics are not being written at all.
+//returns this node's request rate from the newest aggregation cycle, 0 when idle, null when analytics are missing
 async function getRequestRate() {
-	// The identity analytics rows are attributed to. `replication.hostname` is only one of the
-	// fallbacks core resolves it through, and can be unset.
+	//analytics rows are attributed to server.hostname; replication.hostname can be unset
 	const nodeName = server.hostname;
 
-	// Every HTTP request records a `success` sample, aggregated per path and method with `count`
-	// summed across threads, so one cycle's request total is the sum of `count` over its rows.
+	//every http request records a success sample per path+method, so a cycle's request total is the sum of count over its rows
 	const rows = [];
 	let newest = null;
 	const results = await queryMetric('success');
@@ -87,9 +79,7 @@ async function getRequestRate() {
 	}
 
 	if (!newest) {
-		// No request rows can mean an idle node or a dead analytics pipeline, and only the latter
-		// should shed. Core writes a resource-usage row every aggregation cycle regardless of
-		// traffic, so its presence distinguishes the two.
+		//no request rows = idle node or dead analytics; core writes resource-usage every cycle, so its presence means idle
 		const health = await queryMetric('resource-usage');
 		for await (const record of health) {
 			if (record.node === nodeName) return 0;

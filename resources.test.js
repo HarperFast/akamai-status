@@ -33,8 +33,7 @@ function resourceUsageRow(node, id) {
 	return { node, id, metric: 'resource-usage', period: 60_000 };
 }
 
-// Two cycles for node-a: the newest (ids within the 5s cycle margin of each other) sums to
-// 12,000 requests over a 60s period, 200 req/s, and the previous cycle must not be summed in.
+//newest node-a cycle sums to 12,000 requests over 60s = 200 req/s; the previous cycle must not be summed in
 function analyticsRows() {
 	return [
 		successRow('node-b', 200_002, 999_999),
@@ -87,7 +86,7 @@ describe('current_load_for_gtm', () => {
 	});
 
 	it('caps at max when the rate exceeds the target', async () => {
-		// 90,000 requests over 60s is 1,500 req/s against the default 1,000 req/s target.
+		//90,000 requests over 60s = 1,500 req/s against the default 1,000 target
 		operationHandler = () => asyncIterable([successRow('node-a', 200_000, 90_000)]);
 
 		assert.equal(await new current_load_for_gtm().get(), 'load:1000');
