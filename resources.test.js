@@ -25,12 +25,23 @@ globalThis.server = {
 
 const { status, current_load_for_gtm } = await import('./resources.js');
 
-function utilizationRow(node, id, utilization) {
-	return { node, id, utilization, metric: 'utilization' };
+function successRow(node, id, count, path = '/resource', method = 'GET') {
+	return { node, id, count, path, method, metric: 'success', period: 60_000 };
 }
 
+function resourceUsageRow(node, id) {
+	return { node, id, metric: 'resource-usage', period: 60_000 };
+}
+
+// Two cycles for node-a: the newest (ids within the 5s cycle margin of each other) sums to
+// 12,000 requests over a 60s period, 200 req/s, and the previous cycle must not be summed in.
 function analyticsRows() {
-	return [utilizationRow('node-b', 3, 0.9), utilizationRow('node-a', 1, 0.1), utilizationRow('node-a', 2, 0.25)];
+	return [
+		successRow('node-b', 200_002, 999_999),
+		successRow('node-a', 140_000, 60_000),
+		successRow('node-a', 200_000, 9_000, '/resource', 'GET'),
+		successRow('node-a', 200_001, 3_000, '/resource', 'POST'),
+	];
 }
 
 async function* asyncIterable(rows) {
@@ -60,10 +71,10 @@ describe('current_load_for_gtm', () => {
 		Date.now = realDateNow;
 	});
 
-	it("scales this node's newest utilization row, ignoring other nodes", async () => {
+	it("sums this node's newest cycle across paths and methods, ignoring other nodes and older cycles", async () => {
 		operationHandler = () => asyncIterable(analyticsRows());
 
-		assert.equal(await new current_load_for_gtm().get(), 'load:250');
+		assert.equal(await new current_load_for_gtm().get(), 'load:200');
 	});
 
 	it('resolves the node from server.hostname, not replication.hostname', async () => {
@@ -71,8 +82,23 @@ describe('current_load_for_gtm', () => {
 		server.config = { replication: {} };
 		operationHandler = () => asyncIterable(analyticsRows());
 
-		assert.equal(await new current_load_for_gtm().get(), 'load:250');
+		assert.equal(await new current_load_for_gtm().get(), 'load:200');
 		server.config = {};
+	});
+
+	it('caps at max when the rate exceeds the target', async () => {
+		// 90,000 requests over 60s is 1,500 req/s against the default 1,000 req/s target.
+		operationHandler = () => asyncIterable([successRow('node-a', 200_000, 90_000)]);
+
+		assert.equal(await new current_load_for_gtm().get(), 'load:1000');
+	});
+
+	it('falls back to the aggregation period when the row carries no period', async () => {
+		const row = successRow('node-a', 200_000, 12_000);
+		delete row.period;
+		operationHandler = () => asyncIterable([row]);
+
+		assert.equal(await new current_load_for_gtm().get(), 'load:200');
 	});
 
 	it('bounds the analytics query at both ends so core can pin the id range', async () => {
@@ -84,15 +110,28 @@ describe('current_load_for_gtm', () => {
 
 		await new current_load_for_gtm().get();
 
+		assert.equal(request.metric, 'success');
 		assert.equal(typeof request.end_time, 'number');
 		// Default aggregatePeriod of 60s -> a 120s window.
 		assert.equal(request.end_time - request.start_time, 120_000);
 	});
 
-	it('reports max load when this node has no analytics rows', async () => {
-		operationHandler = () => asyncIterable([utilizationRow('node-b', 3, 0.9)]);
+	it('reports zero load, not max, for an idle node whose analytics are still being written', async () => {
+		operationHandler = (request) =>
+			request.metric === 'success'
+				? asyncIterable([successRow('node-b', 200_002, 999_999)])
+				: asyncIterable([resourceUsageRow('node-a', 200_000)]);
+
+		assert.equal(await new current_load_for_gtm().get(), 'load:0');
+		assert.equal(warnings.length, 0);
+	});
+
+	it('reports max load when this node has no analytics rows at all', async () => {
+		operationHandler = () => asyncIterable([successRow('node-b', 200_002, 999_999)]);
 
 		assert.equal(await new current_load_for_gtm().get(), 'load:1000');
+		assert.equal(warnings.length, 1);
+		assert.match(warnings[0], /no analytics rows/);
 	});
 
 	it('reports max load when the analytics query fails', async () => {
@@ -142,7 +181,7 @@ describe('current_load_for_gtm', () => {
 
 		now += 60_000;
 		operationHandler = () => asyncIterable(analyticsRows());
-		assert.equal(await new current_load_for_gtm().get(), 'load:250');
+		assert.equal(await new current_load_for_gtm().get(), 'load:200');
 
 		assert.equal(warnings.length, 2);
 		assert.match(warnings[1], /recovered/);
@@ -158,7 +197,7 @@ describe('current_load_for_gtm', () => {
 		const results = await Promise.all(Array.from({ length: 10 }, () => new current_load_for_gtm().get()));
 
 		assert.equal(queries, 1);
-		assert.deepEqual(new Set(results), new Set(['load:250']));
+		assert.deepEqual(new Set(results), new Set(['load:200']));
 	});
 
 	it('serves the cached value inside the TTL and recomputes after it', async () => {

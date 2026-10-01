@@ -10,6 +10,10 @@ const aggregatePeriodSeconds = Number(server.config?.analytics?.aggregatePeriod)
 const CONFIG = {
 	scale: Number(cfg.loadThresholds?.scale ?? 1000),
 	max: Number(cfg.loadThresholds?.max ?? cfg.loadThresholds?.scale ?? 1000),
+	// The request rate that maps to full scale. GTM compares reported loads across datacenters, so
+	// this anchors what fully loaded means for an instance; tune it per instance size. Guarded like
+	// aggregatePeriod above: a non-numeric or non-positive value would make every load NaN.
+	targetRps: Math.max(Number(cfg.loadThresholds?.targetRps) || 1000, 1),
 	prefix: 'load:',
 	// Half an aggregation period: the underlying metric only moves once per period, so a shorter
 	// TTL just re-runs the scan — and `node` is resolved per row by an awaited table get in core,
@@ -18,8 +22,13 @@ const CONFIG = {
 	// Two aggregation periods, so a node that has just aggregated still has a row in range.
 	// Derived rather than hard-coded: an operator raising analytics.aggregatePeriod past a fixed
 	// window would otherwise push every node to max load permanently.
-	utilizationWindow: Math.max(2000 * aggregatePeriodSeconds, 120000),
+	analyticsWindow: Math.max(2000 * aggregatePeriodSeconds, 120000),
 };
+
+// One aggregation cycle stores its rows in a tight loop while successive cycles are at least half
+// an aggregation period apart, so this margin groups the newest cycle's rows without ever reaching
+// back into the previous cycle.
+const CYCLE_MARGIN_MS = 5000;
 
 let cachedLoad = null;
 let cachedAt = 0;
@@ -46,48 +55,73 @@ function clearDegraded() {
 	}
 }
 
-async function getUtilization() {
+function queryMetric(metric) {
+	// Both bounds are set so core can pin the primary-key range; a one-sided range leaves the
+	// planner free to drive off `metric equals` and decode the metric's whole retained history.
+	const now = Date.now();
+	return server.operation({
+		operation: 'get_analytics',
+		metric,
+		start_time: now - CONFIG.analyticsWindow,
+		end_time: now,
+	});
+}
+
+// Returns this node's HTTP request rate in requests per second from the newest aggregation cycle,
+// 0 for a healthy node that saw no requests, or null when analytics are not being written at all.
+async function getRequestRate() {
 	// The identity analytics rows are attributed to. `replication.hostname` is only one of the
 	// fallbacks core resolves it through, and can be unset.
 	const nodeName = server.hostname;
 
-	// Both bounds are set so core can pin the primary-key range; a one-sided range leaves the
-	// planner free to drive off `metric equals` and decode the metric's whole retained history.
-	const now = Date.now();
-	const results = await server.operation({
-		operation: 'get_analytics',
-		metric: 'utilization',
-		start_time: now - CONFIG.utilizationWindow,
-		end_time: now,
-	});
-
-	let latest = null;
+	// Every HTTP request records a `success` sample, aggregated per path and method with `count`
+	// summed across threads, so one cycle's request total is the sum of `count` over its rows.
+	const rows = [];
+	let newest = null;
+	const results = await queryMetric('success');
 	for await (const record of results) {
-		if (record.node === nodeName && (!latest || record.id > latest.id)) {
-			latest = record;
-		}
+		if (record.node !== nodeName) continue;
+		rows.push(record);
+		if (!newest || record.id > newest.id) newest = record;
 	}
 
-	return latest ? Number(latest.utilization) || 0 : null;
+	if (!newest) {
+		// No request rows can mean an idle node or a dead analytics pipeline, and only the latter
+		// should shed. Core writes a resource-usage row every aggregation cycle regardless of
+		// traffic, so its presence distinguishes the two.
+		const health = await queryMetric('resource-usage');
+		for await (const record of health) {
+			if (record.node === nodeName) return 0;
+		}
+		return null;
+	}
+
+	let requestCount = 0;
+	for (const record of rows) {
+		if (newest.id - record.id <= CYCLE_MARGIN_MS) requestCount += Number(record.count) || 0;
+	}
+	const periodMs = Number(newest.period) || aggregatePeriodSeconds * 1000;
+	return requestCount / (periodMs / 1000);
 }
 
 async function computeLoad() {
-	let utilization;
+	let rate;
 	try {
-		utilization = await getUtilization();
+		rate = await getRequestRate();
 	} catch (error) {
-		return reportMaxLoad('analytics-query-failed', `utilization query failed: ${error?.message ?? error}`);
+		return reportMaxLoad('analytics-query-failed', `request rate query failed: ${error?.message ?? error}`);
 	}
 
-	if (utilization === null) {
+	if (rate === null) {
 		return reportMaxLoad(
-			'no utilization analytics for this node — expected for one aggregation period after a restart, ' +
+			'analytics-missing',
+			'no analytics rows for this node, expected for one aggregation period after a restart; ' +
 				'otherwise check that analytics are being written and that node.hostname matches this node'
 		);
 	}
 
 	clearDegraded();
-	const scaled = Math.round(utilization * CONFIG.scale);
+	const scaled = Math.round((rate / CONFIG.targetRps) * CONFIG.scale);
 	return Math.min(Math.max(scaled, 0), CONFIG.max);
 }
 

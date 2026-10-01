@@ -52,23 +52,26 @@ harper set_status id=availability status=Unavailable
 
 ### GET /current_load_for_gtm
 
-Returns server load for Akamai GTM based on this node's event-loop utilization.
+Returns server load for Akamai GTM based on this node's HTTP request rate.
 
 ```shell
 curl http://localhost:9926/current_load_for_gtm
-# "load:651"
+# "load:200"
 ```
 
-Response format is `load:N` where N is `utilization × scale`, capped at `max`.
+Response format is `load:N` where N is `(requests per second ÷ targetRps) × scale`, capped at `max`.
 
-The underlying `utilization` metric is the mean event-loop utilization across worker threads, aggregated
-once per analytics aggregation period (`analytics.aggregatePeriod`, 60s by default). The response cache and the lookback
-window are both derived from that period, so the endpoint keeps its scan rate proportional to how often
-the number can actually change.
+The rate is computed from the `success` analytics metric, which core records for every HTTP request and
+aggregates once per analytics aggregation period (`analytics.aggregatePeriod`, 60s by default). Request
+count is Akamai's recommended kind of load feedback resource; it idles at zero and rises with exactly the
+traffic GTM steers. Event-loop or CPU utilization do neither, and Akamai's documentation advises against
+them. The response cache and the lookback window are both derived from the aggregation period, so the
+endpoint keeps its scan rate proportional to how often the number can actually change.
 
-If utilization data is unavailable or the query fails, the endpoint reports max load, which takes the node
-out of GTM rotation. That is expected for up to one aggregation period after a restart; entering and
-leaving this state is logged at `warn`, once per episode rather than once per poll.
+A node with no requests in the window reports `load:0` as long as analytics rows are still being written
+for it. If no analytics rows exist at all, or the query fails, the endpoint reports max load, which takes
+the node out of GTM rotation. That is expected for up to one aggregation period after a restart; entering
+and leaving this state is logged at `warn`, once per episode rather than once per poll.
 
 The lookback window is two aggregation periods (minimum 120s), so raising `analytics.aggregatePeriod`
 does not strand the endpoint at max load.
@@ -88,14 +91,18 @@ Optional configuration in `harperdb-config.yaml`:
 ```yaml
 akamaiStatus:
   loadThresholds:
-    scale: 1000 # Multiplier for utilization (default: 1000)
+    targetRps: 1000 # Request rate that maps to full scale (default: 1000)
+    scale: 1000 # Load value reported at targetRps (default: 1000)
     max: 1000 # Maximum load value cap (default: scale value)
 ```
 
+`targetRps` anchors what "fully loaded" means for the instance and should be set per instance size; GTM
+compares the reported loads across datacenters, so the anchor should mean the same thing on each.
+
 **Examples:**
 
-Default: utilization 0.65 → `load:650`
+Default: 200 req/s → `load:200`
 
-With `scale: 100`: utilization 0.65 → `load:65`
+With `targetRps: 400`: 200 req/s → `load:500`
 
-With `max: 500`: utilization 0.65 → `load:500` (capped)
+With `max: 500`: 800 req/s → `load:500` (capped)
