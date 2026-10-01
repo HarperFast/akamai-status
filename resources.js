@@ -27,8 +27,9 @@ const CONFIG = {
 
 // One aggregation cycle stores its rows in a tight loop while successive cycles are at least half
 // an aggregation period apart, so this margin groups the newest cycle's rows without ever reaching
-// back into the previous cycle.
-const CYCLE_MARGIN_MS = 5000;
+// back into the previous cycle. Capped at a quarter period so a small configured aggregatePeriod
+// cannot bring the previous cycle inside the margin.
+const CYCLE_MARGIN_MS = Math.min(5000, (aggregatePeriodSeconds * 1000) / 4);
 
 let cachedLoad = null;
 let cachedAt = 0;
