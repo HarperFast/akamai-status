@@ -62,7 +62,9 @@ curl http://localhost:9926/current_load_for_gtm
 Response format is `load:N` where N is `(requests per second ÷ targetRps) × scale`, capped at `max`. The body is served as `text/plain`, unquoted, so GTM's `load:` leader-string parse works on the raw bytes.
 
 The rate is computed from the `success` analytics metric, which core records for every HTTP request and
-aggregates once per analytics aggregation period (`analytics.aggregatePeriod`, 60s by default). Request
+aggregates once per analytics aggregation period (`analytics.aggregatePeriod`, 60s by default). Each
+aggregate row's `total` is the number of requests for one path and method and its `count` the number that
+succeeded; the component sums `total`, so a node that starts failing requests does not report falling load. Request
 count is Akamai's recommended kind of load feedback resource; it idles at zero and rises with exactly the
 traffic GTM steers. Event-loop or CPU utilization do neither, and Akamai's documentation advises against
 them. The response cache and the lookback window are both derived from the aggregation period, so the

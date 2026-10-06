@@ -72,10 +72,8 @@ async function getRequestRate() {
 	//analytics rows are attributed to server.hostname; replication.hostname can be unset
 	const nodeName = server.hostname;
 
-	//every http request records a success sample per path+method, so a cycle's request total is the sum of count over its rows
-	//core writes a resource-usage row every cycle whether or not any request arrived, in the same
-	//tight loop as that cycle's success rows, so the newest id across both metrics dates the newest
-	//cycle: a success row older than that belongs to a previous cycle and the node has since gone idle
+	//a success row's total is every request for that path+method and count only the successful ones
+	//the newest id across both metrics dates the newest cycle; a resource-usage row is written every cycle, requests or not
 	const rows = [];
 	let newestId = null;
 	const [requests, health] = await Promise.all([queryMetric('success'), queryMetric('resource-usage')]);
@@ -92,11 +90,10 @@ async function getRequestRate() {
 	if (newestId === null) return null;
 
 	const cycleRows = rows.filter((record) => newestId - record.id <= CYCLE_MARGIN_MS);
-	//the newest cycle carries no request rows = idle node
 	if (cycleRows.length === 0) return 0;
 
 	let requestCount = 0;
-	for (const record of cycleRows) requestCount += Number(record.count) || 0;
+	for (const record of cycleRows) requestCount += Number(record.total ?? record.count) || 0;
 	const periodMs = Number(cycleRows[0].period) || aggregatePeriodSeconds * 1000;
 	return requestCount / (periodMs / 1000);
 }

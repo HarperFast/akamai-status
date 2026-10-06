@@ -274,6 +274,29 @@ describe('current_load_for_gtm', () => {
 		assert.equal(warnings.length, 0);
 	});
 
+	it('counts every request, not only the successful ones, so a failing node does not report falling load', async () => {
+		// A success row is a boolean sample: total is the request count, count the successes.
+		// 12,000 requests of which 6,000 succeeded is still 200 req/s.
+		operationHandler = () => asyncIterable([{ ...successRow('node-a', 200_000, 6_000), total: 12_000 }]);
+
+		assert.equal(await loadBody(), 'load:200');
+	});
+
+	it('falls back to safe defaults when threshold or period config is not a finite positive number', async () => {
+		// CONFIG is built at import time, so load a second module instance under the bad config.
+		server.config = {
+			analytics: { aggregatePeriod: 'soon' },
+			akamaiStatus: { loadThresholds: { targetRps: 0, scale: 'abc', max: -5 } },
+		};
+		const { current_load_for_gtm: misconfigured } = await import('./resources.js?config=invalid');
+		server.config = {};
+		operationHandler = () => asyncIterable(analyticsRows());
+
+		const response = await new misconfigured().get();
+		// Defaults of 1,000 for target, scale and max: 200 req/s -> load:200, never load:NaN or load:Infinity.
+		assert.equal(response.data, 'load:200');
+	});
+
 	it('reports zero load when the newest cycle has no request rows, even if an older in-window cycle does', async () => {
 		// The boundary from review: a 60,000-count success row from the previous cycle plus a
 		// resource-usage row from the current one. The node is idle now, not at 1,000 req/s.
