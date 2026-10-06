@@ -73,29 +73,31 @@ async function getRequestRate() {
 	const nodeName = server.hostname;
 
 	//every http request records a success sample per path+method, so a cycle's request total is the sum of count over its rows
+	//core writes a resource-usage row every cycle whether or not any request arrived, in the same
+	//tight loop as that cycle's success rows, so the newest id across both metrics dates the newest
+	//cycle: a success row older than that belongs to a previous cycle and the node has since gone idle
 	const rows = [];
-	let newest = null;
-	const results = await queryMetric('success');
-	for await (const record of results) {
+	let newestId = null;
+	const [requests, health] = await Promise.all([queryMetric('success'), queryMetric('resource-usage')]);
+	for await (const record of requests) {
 		if (record.node !== nodeName) continue;
 		rows.push(record);
-		if (!newest || record.id > newest.id) newest = record;
+		if (newestId === null || record.id > newestId) newestId = record.id;
+	}
+	for await (const record of health) {
+		if (record.node === nodeName && (newestId === null || record.id > newestId)) newestId = record.id;
 	}
 
-	if (!newest) {
-		//no request rows = idle node or dead analytics; core writes resource-usage every cycle, so its presence means idle
-		const health = await queryMetric('resource-usage');
-		for await (const record of health) {
-			if (record.node === nodeName) return 0;
-		}
-		return null;
-	}
+	//no rows of either metric = dead analytics, or a node that was down for longer than the window
+	if (newestId === null) return null;
+
+	const cycleRows = rows.filter((record) => newestId - record.id <= CYCLE_MARGIN_MS);
+	//the newest cycle carries no request rows = idle node
+	if (cycleRows.length === 0) return 0;
 
 	let requestCount = 0;
-	for (const record of rows) {
-		if (newest.id - record.id <= CYCLE_MARGIN_MS) requestCount += Number(record.count) || 0;
-	}
-	const periodMs = Number(newest.period) || aggregatePeriodSeconds * 1000;
+	for (const record of cycleRows) requestCount += Number(record.count) || 0;
+	const periodMs = Number(cycleRows[0].period) || aggregatePeriodSeconds * 1000;
 	return requestCount / (periodMs / 1000);
 }
 

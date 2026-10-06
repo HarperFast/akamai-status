@@ -68,10 +68,13 @@ traffic GTM steers. Event-loop or CPU utilization do neither, and Akamai's docum
 them. The response cache and the lookback window are both derived from the aggregation period, so the
 endpoint keeps its scan rate proportional to how often the number can actually change.
 
-A node with no requests in the window reports `load:0` as long as analytics rows are still being written
-for it. If no analytics rows exist at all, or the query fails, the endpoint reports max load, which takes
-the node out of GTM rotation. That is expected for up to one aggregation period after a restart; entering
-and leaving this state is logged at `warn`, once per episode rather than once per poll.
+Core also writes a `resource-usage` row every aggregation cycle whether or not any request arrived, so
+the newest cycle is dated by whichever metric was written last. A node whose newest cycle carries no
+request rows reports `load:0`, even while an older cycle inside the lookback window still holds a busy
+count. If the window holds no rows of either metric for this node, or the query fails, the endpoint
+reports max load, which takes the node out of GTM rotation. That is expected when analytics have
+stopped being written, or after a node was down for longer than the window; entering and leaving this
+state is logged at `warn`, once per episode rather than once per poll.
 
 The lookback window is two aggregation periods (minimum 120s), so raising `analytics.aggregatePeriod`
 does not strand the endpoint at max load.

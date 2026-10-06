@@ -47,6 +47,136 @@ async function* asyncIterable(rows) {
 	for (const row of rows) yield row;
 }
 
+//verbatim get_analytics rows from a stage node, so the suite proves core's row contract, not a model of it
+function capturedStageRows() {
+	const node = 'q1r-us-east1-b-1.lfct1.devin-enterprise.stage.harperfabric.com';
+	const success = [
+		{
+			id: 1791286787784.3342,
+			period: 60000,
+			metric: 'success',
+			path: 'status',
+			method: 'GET',
+			total: 38,
+			count: 38,
+			ratio: 1,
+			time: 1791286787574.0132,
+			node,
+		},
+		{
+			id: 1791286787786.2764,
+			period: 60000,
+			metric: 'success',
+			path: 'current_load_for_gtm',
+			method: 'GET',
+			total: 6,
+			count: 6,
+			ratio: 1,
+			time: 1791286787574.0132,
+			node,
+		},
+		{
+			id: 1791286877786.0164,
+			period: 60000,
+			metric: 'success',
+			path: 'status',
+			method: 'GET',
+			total: 42,
+			count: 42,
+			ratio: 1,
+			time: 1791286848102.2234,
+			node,
+		},
+		{
+			id: 1791286877788.3594,
+			period: 60000,
+			metric: 'success',
+			path: 'current_load_for_gtm',
+			method: 'GET',
+			total: 6,
+			count: 6,
+			ratio: 1,
+			time: 1791286848102.2234,
+			node,
+		},
+		{
+			id: 1791286907785.8613,
+			period: 60000,
+			metric: 'success',
+			path: 'status',
+			method: 'GET',
+			total: 40,
+			count: 40,
+			ratio: 1,
+			time: 1791286907209.8142,
+			node,
+		},
+		{
+			id: 1791286907788.0466,
+			period: 60000,
+			metric: 'success',
+			path: 'current_load_for_gtm',
+			method: 'GET',
+			total: 4,
+			count: 4,
+			ratio: 1,
+			time: 1791286907209.8142,
+			node,
+		},
+	];
+	const resourceUsage = [
+		{
+			id: 1791286787787.3945,
+			metric: 'resource-usage',
+			userCPUTime: 204.5109999999404,
+			systemCPUTime: 68.16599999996834,
+			minorPageFault: 4,
+			majorPageFault: 0,
+			fsRead: 0,
+			fsWrite: 16,
+			voluntaryContextSwitches: 3057,
+			involuntaryContextSwitches: 206,
+			time: 1791286787787,
+			period: 29999,
+			cpuUtilization: 0.01,
+			node,
+		},
+		{
+			id: 1791286877789.2952,
+			metric: 'resource-usage',
+			userCPUTime: 486.3029999998398,
+			systemCPUTime: 226.2609999999404,
+			minorPageFault: 6,
+			majorPageFault: 0,
+			fsRead: 0,
+			fsWrite: 32,
+			voluntaryContextSwitches: 8845,
+			involuntaryContextSwitches: 377,
+			time: 1791286877789,
+			period: 90002,
+			cpuUtilization: 0.01,
+			node,
+		},
+		{
+			id: 1791286907788.8682,
+			metric: 'resource-usage',
+			userCPUTime: 182.5690000001341,
+			systemCPUTime: 74.00700000009965,
+			minorPageFault: 3,
+			majorPageFault: 0,
+			fsRead: 0,
+			fsWrite: 24,
+			voluntaryContextSwitches: 3011,
+			involuntaryContextSwitches: 140,
+			time: 1791286907788,
+			period: 29999,
+			cpuUtilization: 0.01,
+			node,
+		},
+	];
+	return { node, success, 'resource-usage': resourceUsage };
+}
+
 //the endpoint returns {contentType, data} so harper sends plain text instead of json-quoting the string
 async function loadBody() {
 	const response = await new current_load_for_gtm().get();
@@ -114,19 +244,24 @@ describe('current_load_for_gtm', () => {
 		assert.equal(await loadBody(), 'load:200');
 	});
 
-	it('bounds the analytics query at both ends so core can pin the id range', async () => {
-		let request;
+	it('bounds both analytics queries at both ends so core can pin the id range', async () => {
+		const requests = [];
 		operationHandler = (received) => {
-			request = received;
+			requests.push(received);
 			return asyncIterable(analyticsRows());
 		};
 
 		await loadBody();
 
-		assert.equal(request.metric, 'success');
-		assert.equal(typeof request.end_time, 'number');
-		// Default aggregatePeriod of 60s -> a 120s window.
-		assert.equal(request.end_time - request.start_time, 120_000);
+		assert.deepEqual(
+			requests.map((request) => request.metric),
+			['success', 'resource-usage']
+		);
+		for (const request of requests) {
+			assert.equal(typeof request.end_time, 'number');
+			// Default aggregatePeriod of 60s -> a 120s window.
+			assert.equal(request.end_time - request.start_time, 120_000);
+		}
 	});
 
 	it('reports zero load, not max, for an idle node whose analytics are still being written', async () => {
@@ -137,6 +272,41 @@ describe('current_load_for_gtm', () => {
 
 		assert.equal(await loadBody(), 'load:0');
 		assert.equal(warnings.length, 0);
+	});
+
+	it('reports zero load when the newest cycle has no request rows, even if an older in-window cycle does', async () => {
+		// The boundary from review: a 60,000-count success row from the previous cycle plus a
+		// resource-usage row from the current one. The node is idle now, not at 1,000 req/s.
+		operationHandler = (request) =>
+			request.metric === 'success'
+				? asyncIterable([successRow('node-a', 140_000, 60_000)])
+				: asyncIterable([resourceUsageRow('node-a', 200_000)]);
+
+		assert.equal(await loadBody(), 'load:0');
+		assert.equal(warnings.length, 0);
+	});
+
+	it('keeps reporting the measured rate when the resource-usage row belongs to the same cycle', async () => {
+		// Core writes a cycle's resource-usage row in the same tight loop as its success rows, a few
+		// milliseconds later, so it must not push those rows out of the cycle.
+		operationHandler = (request) =>
+			request.metric === 'success'
+				? asyncIterable(analyticsRows())
+				: asyncIterable([resourceUsageRow('node-a', 200_003)]);
+
+		assert.equal(await loadBody(), 'load:200');
+	});
+
+	it('reproduces an idle stage node from captured production rows', async () => {
+		// Three aggregation cycles of get_analytics output captured from us-east1-b-1 on the lfct1
+		// stage cluster (harper 5.0.2, 2026-10-06), unedited: GTM liveness tests plus load-object
+		// polls, 44 requests in the newest cycle, which the node reported live as load:1.
+		const captured = capturedStageRows();
+		server.hostname = captured.node;
+		operationHandler = (request) => asyncIterable(captured[request.metric]);
+
+		assert.equal(await loadBody(), 'load:1');
+		server.hostname = 'node-a';
 	});
 
 	it('reports max load when this node has no analytics rows at all', async () => {
@@ -200,10 +370,11 @@ describe('current_load_for_gtm', () => {
 		assert.match(warnings[1], /recovered/);
 	});
 
-	it('shares one analytics query across concurrent polls', async () => {
+	it('shares one analytics scan across concurrent polls', async () => {
+		//each scan issues one success query and one resource-usage query, so count scans by the former
 		let queries = 0;
-		operationHandler = () => {
-			queries++;
+		operationHandler = (request) => {
+			if (request.metric === 'success') queries++;
 			return asyncIterable(analyticsRows());
 		};
 
@@ -215,8 +386,8 @@ describe('current_load_for_gtm', () => {
 
 	it('serves the cached value inside the TTL and recomputes after it', async () => {
 		let queries = 0;
-		operationHandler = () => {
-			queries++;
+		operationHandler = (request) => {
+			if (request.metric === 'success') queries++;
 			return asyncIterable(analyticsRows());
 		};
 
