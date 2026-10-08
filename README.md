@@ -52,7 +52,7 @@ harper set_status id=availability status=Unavailable
 
 ### GET /current_load_for_gtm
 
-Returns server load for Akamai GTM: how much request work this node has in flight, per worker thread.
+Returns server load for Akamai GTM: how much request handling this node has in flight, per worker thread.
 
 ```shell
 curl http://localhost:9926/current_load_for_gtm
@@ -60,18 +60,18 @@ curl http://localhost:9926/current_load_for_gtm
 ```
 
 The body is `load:N`, served as `text/plain` and unquoted, so GTM's `load:` leader-string parse works on
-the raw bytes. `N` is the fraction of the node's worker capacity spent on request handling over the newest
-analytics aggregation cycle, times `scale`. With the default `scale` of 1000, `load:1000` means every
-worker was continuously busy with requests, `load:39` is the two-worker stage node serving 8,800 requests
-a minute at half a millisecond each, and an idle node reports `load:0`. A node past saturation reports more
-than `scale`: that is a real reading, not an error, and only `max` clamps it.
+the raw bytes. `N` is the average number of requests inside a handler at once, per worker, over the newest analytics
+aggregation cycle, times `scale`. With the default `scale` of 1000, `load:1000` means one request
+continuously in flight on every worker, whether that request is computing or waiting on storage or an
+origin; `load:39` is the two-worker stage node serving 8,800 requests a minute at half a millisecond each;
+an idle node reports `load:0`. A node past saturation reports more than `scale`: that is a real reading,
+not an error, and only `max` clamps it.
 
-The figure is built from analytics core already records for every HTTP response: the `duration` metric
-(response count and mean handler time per path and method, failed responses included) and, where this
-node terminates TLS itself, the `tls-handshake` metric (new-connection count and mean handshake time per
-port). Summing count times mean over the newest cycle gives the milliseconds of request work in the
-period; dividing by the period and by the worker count gives the busy fraction per worker. Core
-aggregates once per analytics aggregation period (`analytics.aggregatePeriod`, 60s by default).
+The figure is built from the `duration` metric core already records for every HTTP response: the
+response count and mean handler time per path and method, failed responses included. Summing count times
+mean over the newest cycle gives the milliseconds of handler time in the period; dividing by the period
+and by the worker count gives the work in flight per worker. Core aggregates once per analytics
+aggregation period (`analytics.aggregatePeriod`, 60s by default).
 
 This is the kind of feedback resource Akamai's documentation asks for: GTM treats loads as unit-less,
 compares one property's datacenters against each other, and expects the value to rise with the traffic it
@@ -83,8 +83,10 @@ per-worker normalization makes nodes of different sizes comparable with equal GT
 event-loop utilization are deliberately not used; Akamai advises against them because background work
 moves them, and on Fabric the event-loop figure is distorted by harper-pro's profiler.
 
-What the clock does not cover: request parsing and any wait before the handler runs, the transfer of the
-response body to the client, and work on threads other than the HTTP workers. A single saturated worker
+What the clock does not cover: TLS handshakes, request parsing and any wait before the handler runs, the
+transfer of the response body to the client, and work on threads other than the HTTP workers. Handshake
+and transfer times are paced by the client's distance, so counting them would make load depend on where
+GTM's clients are rather than on what the node does. A single saturated worker
 among idle ones is visible only through its stretched handler times, because `duration` is not recorded
 per thread.
 
@@ -130,8 +132,8 @@ GTM rejects the fail-safe value as invalid.
 
 **Examples:**
 
-Default, two workers, 0.08 of each worker busy with requests → `load:80`
+Default, two workers, 0.08 requests in flight per worker on average → `load:80`
 
-Saturated node, handler times stretched, 1.5 of each worker's capacity in flight → `load:1500`
+Saturated node, handler times stretched, 1.5 requests in flight per worker → `load:1500`
 
 Analytics not being written → `load:100000`

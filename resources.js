@@ -16,7 +16,7 @@ const aggregatePeriodSeconds = positiveNumber(server.config?.analytics?.aggregat
 const WORKER_COUNT = positiveNumber(server.workerCount ?? server.config?.threads?.count, 1);
 
 const CONFIG = {
-	//load reported when every worker is continuously busy with request work; GTM treats loads as unit-less
+	//load reported for one request continuously in flight per worker; GTM treats loads as unit-less
 	scale: positiveNumber(cfg.loadThresholds?.scale, 1000),
 	//reported when load cannot be measured, so GTM shifts traffic away; must stay below the GTM resource's upper bound
 	max: positiveNumber(cfg.loadThresholds?.max, 100000),
@@ -71,27 +71,20 @@ function queryMetric(metric) {
 	});
 }
 
-//returns this node's request work in flight per worker over the newest aggregation cycle, 0 when idle, null when analytics are missing
+//returns this node's handler work in flight per worker over the newest aggregation cycle, 0 when idle, null when analytics are missing
 async function getBusyFraction() {
 	//analytics rows are attributed to server.hostname; replication.hostname can be unset
 	const nodeName = server.hostname;
 
-	//a duration row is one path+method's response count and mean handler time for the cycle; a tls-handshake
-	//row is one port's new-connection count and mean handshake time (absent where a proxy terminates TLS)
-	//the newest id across all metrics dates the newest cycle; a resource-usage row is written every cycle, requests or not
+	//a duration row is one path+method's response count and mean handler time for the cycle
+	//the newest id across both metrics dates the newest cycle; a resource-usage row is written every cycle, requests or not
 	const rows = [];
 	let newestId = null;
-	const [durations, handshakes, health] = await Promise.all([
-		queryMetric('duration'),
-		queryMetric('tls-handshake'),
-		queryMetric('resource-usage'),
-	]);
-	for (const results of [durations, handshakes]) {
-		for await (const record of results) {
-			if (record.node !== nodeName) continue;
-			rows.push(record);
-			if (newestId === null || record.id > newestId) newestId = record.id;
-		}
+	const [durations, health] = await Promise.all([queryMetric('duration'), queryMetric('resource-usage')]);
+	for await (const record of durations) {
+		if (record.node !== nodeName) continue;
+		rows.push(record);
+		if (newestId === null || record.id > newestId) newestId = record.id;
 	}
 	for await (const record of health) {
 		if (record.node === nodeName && (newestId === null || record.id > newestId)) newestId = record.id;
@@ -103,7 +96,7 @@ async function getBusyFraction() {
 	const cycleRows = rows.filter((record) => newestId - record.id <= CYCLE_MARGIN_MS);
 	if (cycleRows.length === 0) return 0;
 
-	//count x mean = milliseconds of request work; over the period and the workers it is the busy fraction per worker
+	//count x mean = milliseconds of handler time; over the period and the workers it is the work in flight per worker
 	let busyMs = 0;
 	for (const record of cycleRows) busyMs += (Number(record.count) || 0) * (Number(record.mean) || 0);
 	const periodMs = Number(cycleRows[0].period) || aggregatePeriodSeconds * 1000;

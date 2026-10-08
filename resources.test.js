@@ -411,22 +411,10 @@ describe('current_load_for_gtm', () => {
 		operationHandler = forMetrics({ duration: [durationRow('node-a', 200_000, 180_000, 1)] });
 		assert.equal(await loadBody(), 'load:1500');
 
-		//the default max of 100,000 is a fail-safe value, not a working range: 1.2e7 ms over 60s on two workers = 100,000
+		//the default max of 100,000 is a fail-safe value, not a working range: 2.4e7 ms over 60s on two workers = 200,000, clamped
 		now += 60_000;
-		operationHandler = forMetrics({ duration: [durationRow('node-a', 200_000, 120_000, 100)] });
+		operationHandler = forMetrics({ duration: [durationRow('node-a', 200_000, 240_000, 100)] });
 		assert.equal(await loadBody(), 'load:100000');
-	});
-
-	it('counts TLS handshake time where this node terminates TLS itself', async () => {
-		//1,000 responses at 1ms plus 1,000 new connections at 2ms each = 3,000ms over 60s on two workers = 0.025
-		operationHandler = (request) =>
-			request.metric === 'tls-handshake'
-				? asyncIterable([
-						{ node: 'node-a', id: 200_001, count: 1_000, mean: 2, path: 9926, metric: 'tls-handshake', period: 60_000 },
-					])
-				: asyncIterable([durationRow('node-a', 200_000, 1_000, 1)]);
-
-		assert.equal(await loadBody(), 'load:25');
 	});
 
 	it('weights requests by handler time, so an expensive request counts for more than a cheap one', async () => {
@@ -462,7 +450,7 @@ describe('current_load_for_gtm', () => {
 
 		assert.deepEqual(
 			requests.map((request) => request.metric),
-			['duration', 'tls-handshake', 'resource-usage']
+			['duration', 'resource-usage']
 		);
 		for (const request of requests) {
 			assert.equal(typeof request.end_time, 'number');
@@ -479,6 +467,22 @@ describe('current_load_for_gtm', () => {
 
 		assert.equal(await loadBody(), 'load:0');
 		assert.equal(warnings.length, 0);
+	});
+
+	it('divides by threads.count when server.workerCount is absent, and by one when neither is set', async () => {
+		// WORKER_COUNT is read at import, so each case loads its own module instance.
+		const savedCount = server.workerCount;
+		delete server.workerCount;
+		server.config = { threads: { count: 4 } };
+		const { current_load_for_gtm: fourWorkers } = await import('./resources.js?workers=config');
+		server.config = {};
+		const { current_load_for_gtm: oneWorker } = await import('./resources.js?workers=none');
+		server.workerCount = savedCount;
+		operationHandler = forMetrics({ duration: analyticsRows() });
+
+		// 48,000ms over 60s: 0.2 per worker on four, 0.8 on one.
+		assert.equal((await new fourWorkers().get()).data, 'load:200');
+		assert.equal((await new oneWorker().get()).data, 'load:800');
 	});
 
 	it('falls back to safe defaults when threshold or period config is not a finite positive number', async () => {
@@ -600,7 +604,7 @@ describe('current_load_for_gtm', () => {
 	});
 
 	it('shares one analytics scan across concurrent polls', async () => {
-		//each scan issues one duration query and one resource-usage query, so count scans by the former
+		//each scan issues a duration query and a resource-usage query, so count scans by the former
 		let queries = 0;
 		operationHandler = (request) => {
 			if (request.metric === 'duration') queries++;
