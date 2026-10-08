@@ -106,8 +106,9 @@ async function getBusyFraction() {
 	let busyMs = 0;
 	for (const record of cycleRows) {
 		const count = Number(record.count) || 0;
-		const mean = Number(record.mean);
-		if (count > 0 && !Number.isFinite(mean)) throw new Error(`duration row for ${record.path} has no mean`);
+		const mean = record.mean;
+		if (count > 0 && (typeof mean !== 'number' || !Number.isFinite(mean)))
+			throw new Error(`duration row for ${record.path} has no mean`);
 		busyMs += count * (mean || 0);
 	}
 	const periodMs = Number(cycleRows[0].period) || aggregatePeriodSeconds * 1000;

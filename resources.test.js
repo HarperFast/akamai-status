@@ -491,9 +491,13 @@ describe('current_load_for_gtm', () => {
 		const row = durationRow('node-a', 200_000, 9_000, 2);
 		delete row.mean;
 		operationHandler = forMetrics({ duration: [row] });
-
 		assert.equal(await loadBody(), 'load:100000');
 		assert.match(warnings.at(-1), /no mean/);
+
+		// null is not a mean either, and Number(null) is 0, so it must not slip through as idle.
+		now += 60_000;
+		operationHandler = forMetrics({ duration: [{ ...durationRow('node-a', 200_000, 9_000, 2), mean: null }] });
+		assert.equal(await loadBody(), 'load:100000');
 		// Leave the module healthy so the next test's warning count starts from zero.
 		await startHealthy();
 	});
