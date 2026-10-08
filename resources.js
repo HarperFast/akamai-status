@@ -11,11 +11,15 @@ function positiveNumber(value, fallback) {
 
 const aggregatePeriodSeconds = positiveNumber(server.config?.analytics?.aggregatePeriod, 60);
 
+//http workers serve requests; the main thread does not. server.workerCount is the documented
+//partitioning idiom (hash % server.workerCount); threads.count is the configured fallback
+const WORKER_COUNT = positiveNumber(server.workerCount ?? server.config?.threads?.count, 1);
+
 const CONFIG = {
+	//load reported when every worker is continuously busy with request work; GTM treats loads as unit-less
 	scale: positiveNumber(cfg.loadThresholds?.scale, 1000),
-	max: positiveNumber(cfg.loadThresholds?.max ?? cfg.loadThresholds?.scale, 1000),
-	//request rate that maps to full scale, set per instance size
-	targetRps: positiveNumber(cfg.loadThresholds?.targetRps, 1000),
+	//reported when load cannot be measured, so GTM shifts traffic away; must stay below the GTM resource's upper bound
+	max: positiveNumber(cfg.loadThresholds?.max, 100000),
 	prefix: 'load:',
 	// Half an aggregation period: the underlying metric only moves once per period, so a shorter
 	// TTL just re-runs the scan — and `node` is resolved per row by an awaited table get in core,
@@ -67,20 +71,27 @@ function queryMetric(metric) {
 	});
 }
 
-//returns this node's request rate from the newest aggregation cycle, 0 when idle, null when analytics are missing
-async function getRequestRate() {
+//returns this node's request work in flight per worker over the newest aggregation cycle, 0 when idle, null when analytics are missing
+async function getBusyFraction() {
 	//analytics rows are attributed to server.hostname; replication.hostname can be unset
 	const nodeName = server.hostname;
 
-	//a success row's total is every request for that path+method and count only the successful ones
-	//the newest id across both metrics dates the newest cycle; a resource-usage row is written every cycle, requests or not
+	//a duration row is one path+method's response count and mean handler time for the cycle; a tls-handshake
+	//row is one port's new-connection count and mean handshake time (absent where a proxy terminates TLS)
+	//the newest id across all metrics dates the newest cycle; a resource-usage row is written every cycle, requests or not
 	const rows = [];
 	let newestId = null;
-	const [requests, health] = await Promise.all([queryMetric('success'), queryMetric('resource-usage')]);
-	for await (const record of requests) {
-		if (record.node !== nodeName) continue;
-		rows.push(record);
-		if (newestId === null || record.id > newestId) newestId = record.id;
+	const [durations, handshakes, health] = await Promise.all([
+		queryMetric('duration'),
+		queryMetric('tls-handshake'),
+		queryMetric('resource-usage'),
+	]);
+	for (const results of [durations, handshakes]) {
+		for await (const record of results) {
+			if (record.node !== nodeName) continue;
+			rows.push(record);
+			if (newestId === null || record.id > newestId) newestId = record.id;
+		}
 	}
 	for await (const record of health) {
 		if (record.node === nodeName && (newestId === null || record.id > newestId)) newestId = record.id;
@@ -92,30 +103,30 @@ async function getRequestRate() {
 	const cycleRows = rows.filter((record) => newestId - record.id <= CYCLE_MARGIN_MS);
 	if (cycleRows.length === 0) return 0;
 
-	let requestCount = 0;
-	for (const record of cycleRows) requestCount += Number(record.total ?? record.count) || 0;
+	//count x mean = milliseconds of request work; over the period and the workers it is the busy fraction per worker
+	let busyMs = 0;
+	for (const record of cycleRows) busyMs += (Number(record.count) || 0) * (Number(record.mean) || 0);
 	const periodMs = Number(cycleRows[0].period) || aggregatePeriodSeconds * 1000;
-	return requestCount / (periodMs / 1000);
+	return busyMs / periodMs / WORKER_COUNT;
 }
 
 async function computeLoad() {
-	let rate;
+	let busy;
 	try {
-		rate = await getRequestRate();
+		busy = await getBusyFraction();
 	} catch (error) {
-		return reportMaxLoad('analytics-query-failed', `request rate query failed: ${error?.message ?? error}`);
+		return reportMaxLoad('analytics-query-failed', `busy time query failed: ${error?.message ?? error}`);
 	}
 
-	if (rate === null) {
+	if (busy === null) {
 		return reportMaxLoad(
 			'analytics-missing',
-			'no analytics rows for this node, expected for one aggregation period after a restart; ' +
-				'otherwise check that analytics are being written and that node.hostname matches this node'
+			'no analytics rows for this node; check that analytics are being written and that node.hostname matches this node'
 		);
 	}
 
 	clearDegraded();
-	const scaled = Math.round((rate / CONFIG.targetRps) * CONFIG.scale);
+	const scaled = Math.round(busy * CONFIG.scale);
 	return Math.min(Math.max(scaled, 0), CONFIG.max);
 }
 
@@ -168,7 +179,7 @@ export class status extends Resource {
 
 /**
  * GET /current_load_for_gtm
- * Returns server load for Akamai in format "load:N".
+ * Returns server load for Akamai in format "load:N", from in-flight handler work.
  */
 export class current_load_for_gtm extends Resource {
 	allowRead() {
