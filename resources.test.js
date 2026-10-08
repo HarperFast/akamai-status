@@ -486,7 +486,7 @@ describe('current_load_for_gtm', () => {
 		assert.equal((await new oneWorker().get()).data, 'load:800');
 	});
 
-	it('reports max load, not idle, when a duration row counts responses but carries no mean', async () => {
+	it('reports max load, not idle, when a duration row lacks a numeric count or mean', async () => {
 		// A changed row contract must fail closed: load:0 would attract traffic to a node whose load is unknown.
 		const row = durationRow('node-a', 200_000, 9_000, 2);
 		delete row.mean;
@@ -498,6 +498,15 @@ describe('current_load_for_gtm', () => {
 		now += 60_000;
 		operationHandler = forMetrics({ duration: [{ ...durationRow('node-a', 200_000, 9_000, 2), mean: null }] });
 		assert.equal(await loadBody(), 'load:100000');
+
+		// A row without a numeric count is the same changed contract. Recover first so the warning is a fresh episode.
+		await startHealthy();
+		now += 60_000;
+		const noCount = durationRow('node-a', 200_000, 9_000, 2);
+		delete noCount.count;
+		operationHandler = forMetrics({ duration: [noCount] });
+		assert.equal(await loadBody(), 'load:100000');
+		assert.match(warnings.at(-1), /no count/);
 		// Leave the module healthy so the next test's warning count starts from zero.
 		await startHealthy();
 	});

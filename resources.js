@@ -102,11 +102,12 @@ async function getBusyFraction() {
 	if (cycleRows.length === 0) return 0;
 
 	//count x mean = milliseconds of handler time; over the period and the workers it is the work in flight per worker
-	//a row that counts responses but carries no mean is a changed contract: fail closed rather than report idle
+	//a row without a numeric count, or with responses but no mean, is a changed contract: fail closed rather than report idle
 	let busyMs = 0;
 	for (const record of cycleRows) {
-		const count = Number(record.count) || 0;
-		const mean = record.mean;
+		const { count, mean } = record;
+		if (typeof count !== 'number' || !Number.isFinite(count))
+			throw new Error(`duration row for ${record.path} has no count`);
 		if (count > 0 && (typeof mean !== 'number' || !Number.isFinite(mean)))
 			throw new Error(`duration row for ${record.path} has no mean`);
 		busyMs += count * (mean || 0);
