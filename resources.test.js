@@ -478,11 +478,36 @@ describe('current_load_for_gtm', () => {
 		server.config = {};
 		const { current_load_for_gtm: oneWorker } = await import('./resources.js?workers=none');
 		server.workerCount = savedCount;
+		warnings.length = 0;
 		operationHandler = forMetrics({ duration: analyticsRows() });
 
 		// 48,000ms over 60s: 0.2 per worker on four, 0.8 on one.
 		assert.equal((await new fourWorkers().get()).data, 'load:200');
 		assert.equal((await new oneWorker().get()).data, 'load:800');
+	});
+
+	it('reports max load, not idle, when a duration row counts responses but carries no mean', async () => {
+		// A changed row contract must fail closed: load:0 would attract traffic to a node whose load is unknown.
+		const row = durationRow('node-a', 200_000, 9_000, 2);
+		delete row.mean;
+		operationHandler = forMetrics({ duration: [row] });
+
+		assert.equal(await loadBody(), 'load:100000');
+		assert.match(warnings.at(-1), /no mean/);
+		// Leave the module healthy so the next test's warning count starts from zero.
+		await startHealthy();
+	});
+
+	it('warns once at load when the worker count cannot be determined', async () => {
+		const savedCount = server.workerCount;
+		delete server.workerCount;
+		server.config = {};
+		warnings.length = 0;
+		await import('./resources.js?workers=unknown');
+		server.workerCount = savedCount;
+
+		assert.equal(warnings.length, 1);
+		assert.match(warnings[0], /worker count unknown/);
 	});
 
 	it('falls back to safe defaults when threshold or period config is not a finite positive number', async () => {

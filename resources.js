@@ -14,6 +14,11 @@ const aggregatePeriodSeconds = positiveNumber(server.config?.analytics?.aggregat
 //http workers serve requests; the main thread does not. server.workerCount is the documented
 //partitioning idiom (hash % server.workerCount); threads.count is the configured fallback
 const WORKER_COUNT = positiveNumber(server.workerCount ?? server.config?.threads?.count, 1);
+if (!positiveNumber(server.workerCount ?? server.config?.threads?.count, 0)) {
+	logger.warn(
+		'akamai-status: worker count unknown (no server.workerCount or threads.count), reporting load per node as if it had one worker'
+	);
+}
 
 const CONFIG = {
 	//load reported for one request continuously in flight per worker; GTM treats loads as unit-less
@@ -97,8 +102,14 @@ async function getBusyFraction() {
 	if (cycleRows.length === 0) return 0;
 
 	//count x mean = milliseconds of handler time; over the period and the workers it is the work in flight per worker
+	//a row that counts responses but carries no mean is a changed contract: fail closed rather than report idle
 	let busyMs = 0;
-	for (const record of cycleRows) busyMs += (Number(record.count) || 0) * (Number(record.mean) || 0);
+	for (const record of cycleRows) {
+		const count = Number(record.count) || 0;
+		const mean = Number(record.mean);
+		if (count > 0 && !Number.isFinite(mean)) throw new Error(`duration row for ${record.path} has no mean`);
+		busyMs += count * (mean || 0);
+	}
 	const periodMs = Number(cycleRows[0].period) || aggregatePeriodSeconds * 1000;
 	return busyMs / periodMs / WORKER_COUNT;
 }
@@ -108,7 +119,7 @@ async function computeLoad() {
 	try {
 		busy = await getBusyFraction();
 	} catch (error) {
-		return reportMaxLoad('analytics-query-failed', `busy time query failed: ${error?.message ?? error}`);
+		return reportMaxLoad('analytics-query-failed', `busy time unavailable: ${error?.message ?? error}`);
 	}
 
 	if (busy === null) {
