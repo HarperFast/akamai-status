@@ -34,8 +34,8 @@ function resourceUsageRow(node, id) {
 	return { node, id, metric: 'resource-usage', period: 60_000 };
 }
 
-//newest node-a cycle: 9,000 x 2ms + 3,000 x 10ms = 48,000ms of request work over 60s on two workers = 0.4 per worker = load:400
-//the previous cycle must not be summed in
+// newest node-a cycle: 9,000 x 2ms + 3,000 x 10ms = 48,000ms of request work over 60s on two workers = 0.4 per worker = load:400
+// the previous cycle must not be summed in
 function analyticsRows() {
 	return [
 		durationRow('node-b', 200_002, 999_999, 50),
@@ -49,15 +49,15 @@ async function* asyncIterable(rows) {
 	for (const row of rows) yield row;
 }
 
-//serves each analytics metric its own rows; a metric not listed gets none, as core does for a metric with no samples
+// serves each analytics metric its own rows; a metric not listed gets none, as core does for a metric with no samples
 function forMetrics(rowsByMetric) {
 	return (request) => asyncIterable(rowsByMetric[request.metric] ?? []);
 }
 
-//verbatim get_analytics rows from a stage node, so the suite proves core's row contract, not a model of it
+// verbatim get_analytics rows from a stage node, so the suite proves core's row contract, not a model of it
 function capturedStageRows() {
 	const node = 'q1r-us-east1-b-1.lfct1.devin-enterprise.stage.harperfabric.com';
-	//four idle cycles on 2026-10-07: GTM liveness tests and load-object polls only, which the node reported live as load:0
+	// four idle cycles on 2026-10-07: GTM liveness tests and load-object polls only, which the node reported live as load:0
 	const idle = {
 		'duration': [
 			{
@@ -288,7 +288,7 @@ function capturedStageRows() {
 			},
 		],
 	};
-	//one cycle from the 2026-10-05 flood of the GTM hostname at ~130 req/s, which reads 79 per node and 39 per worker on that two-worker node
+	// one cycle from the 2026-10-05 flood of the GTM hostname at ~130 req/s, which reads 79 per node and 39 per worker on that two-worker node
 	const flood = {
 		'duration': [
 			{
@@ -354,7 +354,7 @@ function capturedStageRows() {
 	return { node, idle, flood };
 }
 
-//the endpoint returns {contentType, data} so harper sends plain text instead of json-quoting the string
+// the endpoint returns {contentType, data} so harper sends plain text instead of json-quoting the string
 async function loadBody() {
 	const response = await new current_load_for_gtm().get();
 	return response.data;
@@ -407,18 +407,18 @@ describe('current_load_for_gtm', () => {
 	});
 
 	it('reports more than scale when every worker is more than continuously busy, and only max clamps it', async () => {
-		//180,000 requests at 1ms over 60s on two workers = 1.5 per worker: a saturated node reports 1,500, not a cap
+		// 180,000 requests at 1ms over 60s on two workers = 1.5 per worker: a saturated node reports 1,500, not a cap
 		operationHandler = forMetrics({ duration: [durationRow('node-a', 200_000, 180_000, 1)] });
 		assert.equal(await loadBody(), 'load:1500');
 
-		//the default max of 100,000 is a fail-safe value, not a working range: 2.4e7 ms over 60s on two workers = 200,000, clamped
+		// the default max of 100,000 is a fail-safe value, not a working range: 2.4e7 ms over 60s on two workers = 200,000, clamped
 		now += 60_000;
 		operationHandler = forMetrics({ duration: [durationRow('node-a', 200_000, 240_000, 100)] });
 		assert.equal(await loadBody(), 'load:100000');
 	});
 
 	it('weights requests by handler time, so an expensive request counts for more than a cheap one', async () => {
-		//the same count at 1ms and at 50ms: 1,000ms + 50,000ms over 60s on two workers = 0.425 per worker
+		// the same count at 1ms and at 50ms: 1,000ms + 50,000ms over 60s on two workers = 0.425 per worker
 		operationHandler = forMetrics({
 			duration: [
 				durationRow('node-a', 200_000, 1_000, 1, '/cached'),
@@ -539,8 +539,8 @@ describe('current_load_for_gtm', () => {
 	});
 
 	it('reports zero load when the newest cycle has no request rows, even if an older in-window cycle does', async () => {
-		// The boundary from review: a busy duration row from the previous cycle plus a resource-usage
-		// row from the current one. The node is idle now, not at 5 per worker.
+		// A busy duration row from the previous cycle plus a resource-usage row from the current one:
+		// the node is idle now, not at 5 per worker.
 		operationHandler = forMetrics({
 			'duration': [durationRow('node-a', 140_000, 60_000, 10)],
 			'resource-usage': [resourceUsageRow('node-a', 200_000)],
@@ -559,6 +559,28 @@ describe('current_load_for_gtm', () => {
 		});
 
 		assert.equal(await loadBody(), 'load:400');
+	});
+
+	it('keeps the cycle together when core wrote its resource-usage row seconds after the duration rows', async () => {
+		// Core awaits a threadpool round trip between a cycle's duration rows and its resource-usage
+		// row, and on a saturated node that wait can pass 5 s. The late row must not date a new, empty
+		// cycle, or the node would report idle at the moment it is overloaded.
+		operationHandler = forMetrics({
+			'duration': analyticsRows(),
+			'resource-usage': [resourceUsageRow('node-a', 206_000)],
+		});
+
+		assert.equal(await loadBody(), 'load:400');
+	});
+
+	it('dates a new cycle from a resource-usage row more than a quarter period after the duration rows', async () => {
+		// 16 s after the newest duration row with a 60 s period: the next cycle ran and found no requests.
+		operationHandler = forMetrics({
+			'duration': analyticsRows(),
+			'resource-usage': [resourceUsageRow('node-a', 216_001)],
+		});
+
+		assert.equal(await loadBody(), 'load:0');
 	});
 
 	it('reproduces an idle stage node from captured production rows', async () => {
@@ -642,7 +664,7 @@ describe('current_load_for_gtm', () => {
 	});
 
 	it('shares one analytics scan across concurrent polls', async () => {
-		//each scan issues a duration query and a resource-usage query, so count scans by the former
+		// each scan issues a duration query and a resource-usage query, so count scans by the former
 		let queries = 0;
 		operationHandler = (request) => {
 			if (request.metric === 'duration') queries++;

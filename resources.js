@@ -3,16 +3,15 @@ const DEFAULT_404_MSG = 'Status endpoint is reporting downtime.';
 
 const cfg = server.config?.akamaiStatus ?? {};
 
-//non-finite or non-positive config would turn loads and windows into NaN/Infinity
 function positiveNumber(value, fallback) {
-	const n = Number(value);
-	return Number.isFinite(n) && n > 0 ? n : fallback;
+	const number = Number(value);
+	return Number.isFinite(number) && number > 0 ? number : fallback;
 }
 
 const aggregatePeriodSeconds = positiveNumber(server.config?.analytics?.aggregatePeriod, 60);
 
-//http workers serve requests; the main thread does not. server.workerCount is the documented
-//partitioning idiom (hash % server.workerCount); threads.count is the configured fallback
+// Only HTTP workers serve requests. server.workerCount is the documented partitioning idiom
+// (hash % server.workerCount); threads.count is the configured fallback.
 const WORKER_COUNT = positiveNumber(server.workerCount ?? server.config?.threads?.count, 1);
 if (!positiveNumber(server.workerCount ?? server.config?.threads?.count, 0)) {
 	logger.warn(
@@ -21,9 +20,10 @@ if (!positiveNumber(server.workerCount ?? server.config?.threads?.count, 0)) {
 }
 
 const CONFIG = {
-	//load reported for one request continuously in flight per worker; GTM treats loads as unit-less
+	// One request continuously in flight per worker reads scale; GTM treats loads as unit-less.
 	scale: positiveNumber(cfg.loadThresholds?.scale, 1000),
-	//reported when load cannot be measured, so GTM shifts traffic away; must stay below the GTM resource's upper bound
+	// Reported when load cannot be measured, so GTM shifts traffic away. The GTM resource's upper
+	// bound must be 0 or at least this value.
 	max: positiveNumber(cfg.loadThresholds?.max, 100000),
 	prefix: 'load:',
 	// Half an aggregation period: the underlying metric only moves once per period, so a shorter
@@ -36,9 +36,11 @@ const CONFIG = {
 	analyticsWindow: Math.max(2000 * aggregatePeriodSeconds, 120000),
 };
 
-//groups one cycle's rows, which are written in a tight loop; cycles are at least half a period apart
-//capped at a quarter period so a small aggregatePeriod can't pull in the previous cycle
-const CYCLE_MARGIN_MS = Math.min(5000, (aggregatePeriodSeconds * 1000) / 4);
+// Core writes a cycle's rows in one tight loop, except that it awaits a threadpool round trip
+// between the duration rows and the resource-usage row, which can take seconds on a saturated
+// node. Cycles are at least half a period apart, so a quarter period separates them and still
+// keeps a late resource-usage row with its cycle's duration rows.
+const CYCLE_MARGIN_MS = (aggregatePeriodSeconds * 1000) / 4;
 
 let cachedLoad = null;
 let cachedAt = 0;
@@ -66,7 +68,7 @@ function clearDegraded() {
 }
 
 function queryMetric(metric) {
-	//both bounds set so core pins the primary-key range instead of decoding the metric's whole history
+	// Both bounds, so core pins the primary-key range instead of decoding the metric's whole history.
 	const now = Date.now();
 	return server.operation({
 		operation: 'get_analytics',
@@ -76,13 +78,14 @@ function queryMetric(metric) {
 	});
 }
 
-//returns this node's handler work in flight per worker over the newest aggregation cycle, 0 when idle, null when analytics are missing
+// Handler work in flight per worker over the newest aggregation cycle: 0 when idle, null when
+// analytics are missing.
 async function getBusyFraction() {
-	//analytics rows are attributed to server.hostname; replication.hostname can be unset
+	// Analytics rows are attributed to server.hostname; replication.hostname can be unset.
 	const nodeName = server.hostname;
 
-	//a duration row is one path+method's response count and mean handler time for the cycle
-	//the newest id across both metrics dates the newest cycle; a resource-usage row is written every cycle, requests or not
+	// A resource-usage row is written every cycle, requests or not, so the newest id across both
+	// metrics dates the newest cycle.
 	const rows = [];
 	let newestId = null;
 	const [durations, health] = await Promise.all([queryMetric('duration'), queryMetric('resource-usage')]);
@@ -95,14 +98,15 @@ async function getBusyFraction() {
 		if (record.node === nodeName && (newestId === null || record.id > newestId)) newestId = record.id;
 	}
 
-	//no rows of either metric = dead analytics, or a node that was down for longer than the window
+	// No rows of either metric: analytics are not being written, or this node was down for longer
+	// than the window.
 	if (newestId === null) return null;
 
 	const cycleRows = rows.filter((record) => newestId - record.id <= CYCLE_MARGIN_MS);
 	if (cycleRows.length === 0) return 0;
 
-	//count x mean = milliseconds of handler time; over the period and the workers it is the work in flight per worker
-	//a row without a numeric count, or with responses but no mean, is a changed contract: fail closed rather than report idle
+	// count x mean is the cycle's handler milliseconds. A row without a numeric count, or with
+	// responses but no mean, is a changed contract: fail closed rather than report idle.
 	let busyMs = 0;
 	for (const record of cycleRows) {
 		const { count, mean } = record;
@@ -193,7 +197,8 @@ export class current_load_for_gtm extends Resource {
 	}
 
 	async get() {
-		//explicit text content type, otherwise harper serializes the bare string to json and GTM's load: leader-string parse sees a quoted body
+		// Without an explicit content type Harper serializes the bare string to JSON, and GTM's
+		// leader-string parse sees a quoted body.
 		return { contentType: 'text/plain', data: `${CONFIG.prefix}${await getLoad()}` };
 	}
 }
