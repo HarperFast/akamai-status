@@ -81,6 +81,7 @@ async function getBusyFraction() {
 	let newestId = null;
 	let cyclePeriod = null;
 	let busyMs = 0;
+	let malformed = null;
 	for await (const record of durations) {
 		if (record.node !== nodeName) continue;
 		const time = Number(record.time);
@@ -89,19 +90,21 @@ async function getBusyFraction() {
 			newestTime = time;
 			cyclePeriod = null;
 			busyMs = 0;
+			malformed = null;
 		}
 		if (newestId === null || record.id > newestId) newestId = record.id;
 		if (time !== newestTime) continue;
-		// A row without a numeric count, or with responses but no mean, is a changed contract: fail
-		// closed rather than report idle.
+		// A newest-cycle row without a numeric count, or with responses but no mean, is a changed
+		// contract: fail closed rather than report idle. Older cycles are not this node's load, so
+		// their rows are not judged.
 		const { count, mean } = record;
-		if (typeof count !== 'number' || !Number.isFinite(count))
-			throw new Error(`duration row for ${record.path} has no count`);
-		if (count > 0 && (typeof mean !== 'number' || !Number.isFinite(mean)))
-			throw new Error(`duration row for ${record.path} has no mean`);
-		busyMs += count * (mean || 0);
+		if (typeof count !== 'number' || !Number.isFinite(count)) malformed ??= `duration row for ${record.path} has no count`;
+		else if (count > 0 && (typeof mean !== 'number' || !Number.isFinite(mean)))
+			malformed ??= `duration row for ${record.path} has no mean`;
+		else busyMs += count * (mean || 0);
 		cyclePeriod ??= Number(record.period) || null;
 	}
+	if (malformed) throw new Error(malformed);
 	// A cycle writes its resource-usage row after its duration rows, requests or not, so a second
 	// one after the newest duration row means a later cycle ran and found no requests.
 	let usageRowsAfter = 0;

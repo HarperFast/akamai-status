@@ -528,7 +528,6 @@ describe('current_load_for_gtm', () => {
 		operationHandler = forMetrics({ duration: analyticsRows() });
 
 		const response = await new misconfigured().get();
-		// Defaults for scale and max: 0.4 per worker -> load:400, never load:NaN or load:Infinity.
 		assert.equal(response.data, 'load:400');
 	});
 
@@ -591,6 +590,13 @@ describe('current_load_for_gtm', () => {
 		assert.equal(await loadBody(), 'load:0');
 	});
 
+	it('does not judge a malformed row from an older cycle', async () => {
+		const stale = { ...durationRow('node-a', 140_000, 60_000, 10), mean: null };
+		operationHandler = forMetrics({ duration: [stale, ...analyticsRows()] });
+
+		assert.equal(await loadBody(), 'load:400');
+	});
+
 	it('reports max load, not idle, when a duration row carries no cycle time', async () => {
 		const row = durationRow('node-a', 200_000, 9_000, 2);
 		delete row.time;
@@ -610,7 +616,6 @@ describe('current_load_for_gtm', () => {
 	});
 
 	it('reproduces a flooded stage node from captured production rows', async () => {
-		// 8,787 liveness-path responses at 0.52ms plus 10 load polls at 11.8ms = 4,723ms over 60s on two workers.
 		const captured = capturedStageRows();
 		server.hostname = captured.node;
 		operationHandler = (request) => asyncIterable(captured.flood[request.metric] ?? []);
@@ -681,7 +686,6 @@ describe('current_load_for_gtm', () => {
 	});
 
 	it('shares one analytics scan across concurrent polls', async () => {
-		// each scan issues a duration query and a resource-usage query, so count scans by the former
 		let queries = 0;
 		operationHandler = (request) => {
 			if (request.metric === 'duration') queries++;
