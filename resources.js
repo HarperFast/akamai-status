@@ -10,10 +10,9 @@ function positiveNumber(value, fallback) {
 
 const aggregatePeriodSeconds = positiveNumber(server.config?.analytics?.aggregatePeriod, 60);
 
-// Only HTTP workers serve requests. server.workerCount is the documented partitioning idiom
-// (hash % server.workerCount); threads.count is the configured fallback.
-const WORKER_COUNT = positiveNumber(server.workerCount ?? server.config?.threads?.count, 1);
-if (!positiveNumber(server.workerCount ?? server.config?.threads?.count, 0)) {
+const configuredWorkers = positiveNumber(server.workerCount, positiveNumber(server.config?.threads?.count, 0));
+const WORKER_COUNT = configuredWorkers || 1;
+if (!configuredWorkers) {
 	logger.warn(
 		'akamai-status: worker count unknown (no server.workerCount or threads.count), reporting load per node as if it had one worker'
 	);
@@ -35,12 +34,6 @@ const CONFIG = {
 	// window would otherwise push every node to max load permanently.
 	analyticsWindow: Math.max(2000 * aggregatePeriodSeconds, 120000),
 };
-
-// Core writes a cycle's rows in one tight loop, except that it awaits a threadpool round trip
-// between the duration rows and the resource-usage row, which can take seconds on a saturated
-// node. Cycles are at least half a period apart, so a quarter period separates them and still
-// keeps a late resource-usage row with its cycle's duration rows.
-const CYCLE_MARGIN_MS = (aggregatePeriodSeconds * 1000) / 4;
 
 let cachedLoad = null;
 let cachedAt = 0;
@@ -67,9 +60,8 @@ function clearDegraded() {
 	}
 }
 
-function queryMetric(metric) {
+function queryMetric(metric, now) {
 	// Both bounds, so core pins the primary-key range instead of decoding the metric's whole history.
-	const now = Date.now();
 	return server.operation({
 		operation: 'get_analytics',
 		metric,
@@ -78,35 +70,45 @@ function queryMetric(metric) {
 	});
 }
 
-// Handler work in flight per worker over the newest aggregation cycle: 0 when idle, null when
-// analytics are missing.
 async function getBusyFraction() {
 	// Analytics rows are attributed to server.hostname; replication.hostname can be unset.
 	const nodeName = server.hostname;
+	const now = Date.now();
+	const [durations, health] = await Promise.all([queryMetric('duration', now), queryMetric('resource-usage', now)]);
 
-	// A resource-usage row is written every cycle, requests or not, so the newest id across both
-	// metrics dates the newest cycle.
-	const rows = [];
+	// Core stamps every duration row of a cycle with the cycle's time, so the newest time is the
+	// newest cycle however close together two cycles were written.
+	const cycleRows = [];
+	let newestTime = null;
 	let newestId = null;
-	const [durations, health] = await Promise.all([queryMetric('duration'), queryMetric('resource-usage')]);
 	for await (const record of durations) {
 		if (record.node !== nodeName) continue;
-		rows.push(record);
+		const time = Number(record.time);
+		if (!Number.isFinite(time)) throw new Error(`duration row for ${record.path} has no time`);
+		if (newestTime === null || time > newestTime) {
+			newestTime = time;
+			cycleRows.length = 0;
+		}
+		if (time === newestTime) cycleRows.push(record);
 		if (newestId === null || record.id > newestId) newestId = record.id;
 	}
+	// A cycle writes its resource-usage row after its duration rows, requests or not, so a second
+	// one after the newest duration row means a later cycle ran and found no requests.
+	let usageRowsAfter = 0;
+	let sawUsage = false;
 	for await (const record of health) {
-		if (record.node === nodeName && (newestId === null || record.id > newestId)) newestId = record.id;
+		if (record.node !== nodeName) continue;
+		sawUsage = true;
+		if (newestId !== null && record.id >= newestId) usageRowsAfter++;
 	}
 
 	// No rows of either metric: analytics are not being written, or this node was down for longer
 	// than the window.
-	if (newestId === null) return null;
+	if (newestTime === null) return sawUsage ? 0 : null;
+	if (usageRowsAfter >= 2) return 0;
 
-	const cycleRows = rows.filter((record) => newestId - record.id <= CYCLE_MARGIN_MS);
-	if (cycleRows.length === 0) return 0;
-
-	// count x mean is the cycle's handler milliseconds. A row without a numeric count, or with
-	// responses but no mean, is a changed contract: fail closed rather than report idle.
+	// A row without a numeric count, or with responses but no mean, is a changed contract: fail
+	// closed rather than report idle.
 	let busyMs = 0;
 	for (const record of cycleRows) {
 		const { count, mean } = record;

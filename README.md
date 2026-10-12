@@ -94,10 +94,12 @@ GTM balances datacenters, not nodes. The GTM resource aggregates its datacenter'
 Fabric), so with several nodes in one datacenter GTM sees one number for all of them and cannot shed from
 one node alone. Nodes in one datacenter should be the same size.
 
-Core also writes a `resource-usage` row every aggregation cycle whether or not any request arrived, so
-the newest cycle is dated by whichever metric was written last. A node whose newest cycle carries no
-request rows reports `load:0`, even while an older cycle inside the lookback window still holds a busy
-count. If the window holds no rows of either metric for this node, or the query fails, the endpoint
+Core stamps every request row of a cycle with that cycle's time, so the newest time is the newest cycle
+however close together two cycles were written. Core also writes a `resource-usage` row after every
+cycle's request rows whether or not any request arrived, so a second `resource-usage` row after the
+newest request row means a later cycle found no requests: the node reports `load:0`, even while an
+older cycle inside the lookback window still holds a busy count. If the window holds no rows of either
+metric for this node, or the query fails, the endpoint
 reports `max`, which takes the node out of GTM rotation. That is expected when analytics have stopped
 being written, or after a node was down for longer than the window; entering and leaving this state is
 logged at `warn`, once per episode rather than once per poll.

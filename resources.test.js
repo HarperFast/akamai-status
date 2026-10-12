@@ -26,8 +26,10 @@ globalThis.server = {
 
 const { status, current_load_for_gtm } = await import('./resources.js');
 
+// Core stamps every duration row of a cycle with one time; here that is the id's whole second.
 function durationRow(node, id, count, mean, path = '/resource', method = 'GET') {
-	return { node, id, count, mean, path, method, metric: 'duration', period: 60_000 };
+	const time = Math.floor(id / 1000) * 1000;
+	return { node, id, time, count, mean, path, method, metric: 'duration', period: 60_000 };
 }
 
 function resourceUsageRow(node, id) {
@@ -54,7 +56,7 @@ function forMetrics(rowsByMetric) {
 	return (request) => asyncIterable(rowsByMetric[request.metric] ?? []);
 }
 
-// verbatim get_analytics rows from a stage node, so the suite proves core's row contract, not a model of it
+// Verbatim get_analytics rows from a stage node.
 function capturedStageRows() {
 	const node = 'q1r-us-east1-b-1.lfct1.devin-enterprise.stage.harperfabric.com';
 	// four idle cycles on 2026-10-07: GTM liveness tests and load-object polls only, which the node reported live as load:0
@@ -354,7 +356,6 @@ function capturedStageRows() {
 	return { node, idle, flood };
 }
 
-// the endpoint returns {contentType, data} so harper sends plain text instead of json-quoting the string
 async function loadBody() {
 	const response = await new current_load_for_gtm().get();
 	return response.data;
@@ -539,11 +540,11 @@ describe('current_load_for_gtm', () => {
 	});
 
 	it('reports zero load when the newest cycle has no request rows, even if an older in-window cycle does', async () => {
-		// A busy duration row from the previous cycle plus a resource-usage row from the current one:
-		// the node is idle now, not at 5 per worker.
+		// A busy duration row from the previous cycle, that cycle's resource-usage row, and the
+		// current cycle's resource-usage row with no requests: the node is idle now, not at 5 per worker.
 		operationHandler = forMetrics({
 			'duration': [durationRow('node-a', 140_000, 60_000, 10)],
-			'resource-usage': [resourceUsageRow('node-a', 200_000)],
+			'resource-usage': [resourceUsageRow('node-a', 140_003), resourceUsageRow('node-a', 200_000)],
 		});
 
 		assert.equal(await loadBody(), 'load:0');
@@ -573,14 +574,37 @@ describe('current_load_for_gtm', () => {
 		assert.equal(await loadBody(), 'load:400');
 	});
 
-	it('dates a new cycle from a resource-usage row more than a quarter period after the duration rows', async () => {
-		// 16 s after the newest duration row with a 60 s period: the next cycle ran and found no requests.
+	it('sums only the newest cycle when a slow cycle and the next one were written moments apart', async () => {
+		// While core catches up, a cycle that took most of a period and the next one can be written
+		// within seconds of each other. Only the newest cycle is this node's load.
+		operationHandler = forMetrics({
+			'duration': [
+				durationRow('node-a', 199_990, 60_000, 10, '/resource', 'GET'),
+				durationRow('node-a', 199_991, 60_000, 10, '/resource', 'POST'),
+				...analyticsRows(),
+			],
+			'resource-usage': [resourceUsageRow('node-a', 199_992), resourceUsageRow('node-a', 200_003)],
+		});
+
+		assert.equal(await loadBody(), 'load:400');
+	});
+
+	it('reports zero load once a later cycle has written its resource-usage row and no request rows', async () => {
 		operationHandler = forMetrics({
 			'duration': analyticsRows(),
-			'resource-usage': [resourceUsageRow('node-a', 216_001)],
+			'resource-usage': [resourceUsageRow('node-a', 200_003), resourceUsageRow('node-a', 230_000)],
 		});
 
 		assert.equal(await loadBody(), 'load:0');
+	});
+
+	it('reports max load, not idle, when a duration row carries no cycle time', async () => {
+		const row = durationRow('node-a', 200_000, 9_000, 2);
+		delete row.time;
+		operationHandler = forMetrics({ duration: [row] });
+
+		assert.equal(await loadBody(), 'load:100000');
+		assert.match(warnings.at(-1), /no time/);
 	});
 
 	it('reproduces an idle stage node from captured production rows', async () => {
