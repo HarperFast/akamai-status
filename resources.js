@@ -19,7 +19,6 @@ if (!configuredWorkers) {
 }
 
 const CONFIG = {
-	// One request continuously in flight per worker reads scale; GTM treats loads as unit-less.
 	scale: positiveNumber(cfg.loadThresholds?.scale, 1000),
 	// Reported when load cannot be measured, so GTM shifts traffic away. The GTM resource's upper
 	// bound must be 0 or at least this value.
@@ -78,19 +77,30 @@ async function getBusyFraction() {
 
 	// Core stamps every duration row of a cycle with the cycle's time, so the newest time is the
 	// newest cycle however close together two cycles were written.
-	const cycleRows = [];
 	let newestTime = null;
 	let newestId = null;
+	let cyclePeriod = null;
+	let busyMs = 0;
 	for await (const record of durations) {
 		if (record.node !== nodeName) continue;
 		const time = Number(record.time);
 		if (!Number.isFinite(time)) throw new Error(`duration row for ${record.path} has no time`);
 		if (newestTime === null || time > newestTime) {
 			newestTime = time;
-			cycleRows.length = 0;
+			cyclePeriod = null;
+			busyMs = 0;
 		}
-		if (time === newestTime) cycleRows.push(record);
 		if (newestId === null || record.id > newestId) newestId = record.id;
+		if (time !== newestTime) continue;
+		// A row without a numeric count, or with responses but no mean, is a changed contract: fail
+		// closed rather than report idle.
+		const { count, mean } = record;
+		if (typeof count !== 'number' || !Number.isFinite(count))
+			throw new Error(`duration row for ${record.path} has no count`);
+		if (count > 0 && (typeof mean !== 'number' || !Number.isFinite(mean)))
+			throw new Error(`duration row for ${record.path} has no mean`);
+		busyMs += count * (mean || 0);
+		cyclePeriod ??= Number(record.period) || null;
 	}
 	// A cycle writes its resource-usage row after its duration rows, requests or not, so a second
 	// one after the newest duration row means a later cycle ran and found no requests.
@@ -107,18 +117,7 @@ async function getBusyFraction() {
 	if (newestTime === null) return sawUsage ? 0 : null;
 	if (usageRowsAfter >= 2) return 0;
 
-	// A row without a numeric count, or with responses but no mean, is a changed contract: fail
-	// closed rather than report idle.
-	let busyMs = 0;
-	for (const record of cycleRows) {
-		const { count, mean } = record;
-		if (typeof count !== 'number' || !Number.isFinite(count))
-			throw new Error(`duration row for ${record.path} has no count`);
-		if (count > 0 && (typeof mean !== 'number' || !Number.isFinite(mean)))
-			throw new Error(`duration row for ${record.path} has no mean`);
-		busyMs += count * (mean || 0);
-	}
-	const periodMs = Number(cycleRows[0].period) || aggregatePeriodSeconds * 1000;
+	const periodMs = cyclePeriod || aggregatePeriodSeconds * 1000;
 	return busyMs / periodMs / WORKER_COUNT;
 }
 

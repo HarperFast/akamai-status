@@ -36,8 +36,6 @@ function resourceUsageRow(node, id) {
 	return { node, id, metric: 'resource-usage', period: 60_000 };
 }
 
-// newest node-a cycle: 9,000 x 2ms + 3,000 x 10ms = 48,000ms of request work over 60s on two workers = 0.4 per worker = load:400
-// the previous cycle must not be summed in
 function analyticsRows() {
 	return [
 		durationRow('node-b', 200_002, 999_999, 50),
@@ -51,7 +49,6 @@ async function* asyncIterable(rows) {
 	for (const row of rows) yield row;
 }
 
-// serves each analytics metric its own rows; a metric not listed gets none, as core does for a metric with no samples
 function forMetrics(rowsByMetric) {
 	return (request) => asyncIterable(rowsByMetric[request.metric] ?? []);
 }
@@ -408,18 +405,15 @@ describe('current_load_for_gtm', () => {
 	});
 
 	it('reports more than scale when every worker is more than continuously busy, and only max clamps it', async () => {
-		// 180,000 requests at 1ms over 60s on two workers = 1.5 per worker: a saturated node reports 1,500, not a cap
 		operationHandler = forMetrics({ duration: [durationRow('node-a', 200_000, 180_000, 1)] });
 		assert.equal(await loadBody(), 'load:1500');
 
-		// the default max of 100,000 is a fail-safe value, not a working range: 2.4e7 ms over 60s on two workers = 200,000, clamped
 		now += 60_000;
 		operationHandler = forMetrics({ duration: [durationRow('node-a', 200_000, 240_000, 100)] });
 		assert.equal(await loadBody(), 'load:100000');
 	});
 
 	it('weights requests by handler time, so an expensive request counts for more than a cheap one', async () => {
-		// the same count at 1ms and at 50ms: 1,000ms + 50,000ms over 60s on two workers = 0.425 per worker
 		operationHandler = forMetrics({
 			duration: [
 				durationRow('node-a', 200_000, 1_000, 1, '/cached'),
@@ -482,7 +476,6 @@ describe('current_load_for_gtm', () => {
 		warnings.length = 0;
 		operationHandler = forMetrics({ duration: analyticsRows() });
 
-		// 48,000ms over 60s: 0.2 per worker on four, 0.8 on one.
 		assert.equal((await new fourWorkers().get()).data, 'load:200');
 		assert.equal((await new oneWorker().get()).data, 'load:800');
 	});
