@@ -19,11 +19,12 @@ if (!configuredWorkers) {
 }
 
 // A window shorter than GTM's 30 s poll interval can hold no report on an idle node and flap to
-// max; one longer than what core retains divides by time it cannot see. Core keeps raw reports for
-// at least one aggregation period.
+// max; one longer than what core retains divides by time it cannot see. Core reads
+// analytics.rawRetentionMs as one hour when unset and keeps at least one aggregation period.
 const GTM_POLL_MS = 30_000;
+const configuredRetentionMs = Number(server.config?.analytics?.rawRetentionMs ?? 3_600_000);
 const retainedMs = Math.max(
-	positiveNumber(server.config?.analytics?.rawRetentionMs, 3_600_000),
+	Number.isFinite(configuredRetentionMs) ? configuredRetentionMs : 3_600_000,
 	aggregatePeriodSeconds * 1000
 );
 const requestedWindowMs = positiveNumber(cfg.loadThresholds?.windowSeconds, aggregatePeriodSeconds) * 1000;
@@ -41,9 +42,7 @@ const CONFIG = {
 	max: positiveNumber(cfg.loadThresholds?.max, 100000),
 	prefix: 'load:',
 	window: windowMs,
-	// Each worker caches its own value, and the scan decodes every report in the window: 14 MB in
-	// about 25 ms at 200 active endpoints and 5,700 requests per second on a two-worker laptop.
-	// Half the window matches GTM's 30 s poll interval and bounds a many-worker node's decode work.
+	// Half the window matches GTM's 30 s poll interval; every worker scans the window on a miss.
 	cacheTtl: Math.max(windowMs / 2, 2000),
 };
 

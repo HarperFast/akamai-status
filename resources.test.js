@@ -194,8 +194,14 @@ describe('current_load_for_gtm', () => {
 		};
 		warnings.length = 0;
 		await import('./resources.js?window=short-period');
-		server.config = {};
 		assert.match(warnings[0], /60s clamped to 10s/);
+
+		// rawRetentionMs of 0 means one period to core, not the one-hour default.
+		server.config = { analytics: { rawRetentionMs: 0 }, akamaiStatus: { loadThresholds: { windowSeconds: 600 } } };
+		warnings.length = 0;
+		await import('./resources.js?window=zero-retention');
+		server.config = {};
+		assert.match(warnings[0], /600s clamped to 60s/);
 
 		const requests = [];
 		searchHandler = (received) => {
