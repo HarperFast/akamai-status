@@ -44,8 +44,6 @@ function report(id, threadId, metrics) {
 	return { id, time: Math.floor(id), period: 1000.2, threadId, metrics };
 }
 
-// Two workers over a window: 9,000 x 2 ms + 3,000 x 10 ms = 48,000 ms of handler time over 60 s on
-// two workers = 0.4 per worker = load:400
 function windowReports() {
 	return [
 		report(1_000_000 - 50_000, 1, [
@@ -125,18 +123,15 @@ describe('current_load_for_gtm', () => {
 	});
 
 	it('reports more than scale when every worker is more than continuously busy, and only max clamps it', async () => {
-		// 180,000 responses at 1 ms over 60 s on two workers = 1.5 per worker.
 		searchHandler = serving([report(now - 1_000, 1, [duration('/resource', 180_000, 1)])]);
 		assert.equal(await loadBody(), 'load:1500');
 
-		// 2.4e7 ms over 60 s on two workers = 200,000, clamped at the fail-safe max.
 		now += 60_000;
 		searchHandler = serving([report(now - 1_000, 1, [duration('/resource', 240_000, 100)])]);
 		assert.equal(await loadBody(), 'load:100000');
 	});
 
 	it('weights requests by handler time, so an expensive request counts for more than a cheap one', async () => {
-		// 1,000 at 1 ms and 1,000 at 50 ms = 51,000 ms over 60 s on two workers = 0.425 per worker.
 		searchHandler = serving([
 			report(now - 2_000, 1, [duration('/cached', 1_000, 1)]),
 			report(now - 1_000, 2, [duration('/query', 1_000, 50)]),
@@ -168,12 +163,40 @@ describe('current_load_for_gtm', () => {
 		const requests = [];
 		searchHandler = (received) => {
 			requests.push(received);
-			// 48,000 ms over 30 s on two workers = 0.8 per worker.
 			return asyncIterable(windowReports());
 		};
 
 		assert.equal((await new shortWindow().get()).data, 'load:800');
 		assert.equal(requests[0].conditions[0].value, now - 30_000);
+	});
+
+	it('clamps the window to the GTM poll interval below and the raw retention above, and says so', async () => {
+		server.config = { akamaiStatus: { loadThresholds: { windowSeconds: 5 } } };
+		warnings.length = 0;
+		const { current_load_for_gtm: tooShort } = await import('./resources.js?window=5');
+		assert.equal(warnings.length, 1);
+		assert.match(warnings[0], /5s clamped to 30s/);
+
+		server.config = {
+			analytics: { rawRetentionMs: 120_000 },
+			akamaiStatus: { loadThresholds: { windowSeconds: 600 } },
+		};
+		warnings.length = 0;
+		const { current_load_for_gtm: tooLong } = await import('./resources.js?window=600');
+		server.config = {};
+		assert.equal(warnings.length, 1);
+		assert.match(warnings[0], /600s clamped to 120s/);
+
+		const requests = [];
+		searchHandler = (received) => {
+			requests.push(received);
+			return asyncIterable(windowReports());
+		};
+		// 48,000 ms over 30 s on two workers is 0.8; over 120 s it is 0.2.
+		assert.equal((await new tooShort().get()).data, 'load:800');
+		assert.equal(requests.at(-1).conditions[0].value, now - 30_000);
+		assert.equal((await new tooLong().get()).data, 'load:200');
+		assert.equal(requests.at(-1).conditions[0].value, now - 120_000);
 	});
 
 	it('divides by threads.count when server.workerCount is absent, and by one when neither is set', async () => {
@@ -188,7 +211,6 @@ describe('current_load_for_gtm', () => {
 		warnings.length = 0;
 		searchHandler = serving(windowReports());
 
-		// 48,000 ms over 60 s: 0.2 per worker on four, 0.8 on one.
 		assert.equal((await new fourWorkers().get()).data, 'load:200');
 		assert.equal((await new oneWorker().get()).data, 'load:800');
 	});
@@ -214,7 +236,6 @@ describe('current_load_for_gtm', () => {
 		server.config = {};
 		searchHandler = serving(windowReports());
 
-		// Defaults for scale, max and a 60 s window: 0.4 per worker -> load:400, never load:NaN.
 		assert.equal((await new misconfigured().get()).data, 'load:400');
 	});
 
@@ -348,12 +369,12 @@ describe('current_load_for_gtm', () => {
 		};
 
 		await loadBody();
-		// Inside the derived TTL, a sixth of the 60 s window.
-		now += 8_000;
+		// Inside the derived TTL, half the 60 s window.
+		now += 20_000;
 		await loadBody();
 		assert.equal(queries, 1);
 
-		now += 3_000;
+		now += 20_000;
 		await loadBody();
 		assert.equal(queries, 2);
 	});

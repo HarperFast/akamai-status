@@ -19,8 +19,18 @@ if (!configuredWorkers) {
 }
 
 // Handler work is averaged over the last window: one aggregation period by default, the span the
-// aggregate rows describe, so the number means the same thing in both.
-const windowMs = positiveNumber(cfg.loadThresholds?.windowSeconds, aggregatePeriodSeconds) * 1000;
+// aggregate rows describe, so the number means the same thing in both. A window shorter than GTM's
+// 30 s poll interval can hold no report on an idle node and flap to max; one longer than core's raw
+// retention divides by time it cannot see.
+const MIN_WINDOW_MS = 30_000;
+const rawRetentionMs = positiveNumber(server.config?.analytics?.rawRetentionMs, 3_600_000);
+const requestedWindowMs = positiveNumber(cfg.loadThresholds?.windowSeconds, aggregatePeriodSeconds) * 1000;
+const windowMs = Math.min(Math.max(requestedWindowMs, MIN_WINDOW_MS), Math.max(rawRetentionMs, MIN_WINDOW_MS));
+if (windowMs !== requestedWindowMs) {
+	logger.warn(
+		`akamai-status: load window of ${requestedWindowMs / 1000}s clamped to ${windowMs / 1000}s (between 30s and analytics.rawRetentionMs)`
+	);
+}
 
 const CONFIG = {
 	scale: positiveNumber(cfg.loadThresholds?.scale, 1000),
@@ -29,9 +39,10 @@ const CONFIG = {
 	max: positiveNumber(cfg.loadThresholds?.max, 100000),
 	prefix: 'load:',
 	window: windowMs,
-	// A worker flushes a report about once a second while it serves requests, so the value moves
-	// every second; GTM's agents poll every 30 s.
-	cacheTtl: Math.max(windowMs / 6, 2000),
+	// Each worker caches its own value, and the scan decodes every report in the window: 14 MB in
+	// about 25 ms at 200 active endpoints and 5,700 requests per second on a two-worker laptop.
+	// Half the window matches GTM's 30 s poll interval and bounds a many-worker node's decode work.
+	cacheTtl: Math.max(windowMs / 2, 2000),
 };
 
 let cachedLoad = null;
@@ -59,10 +70,8 @@ function clearDegraded() {
 	}
 }
 
-// Handler work in flight per worker over the last window, from this node's own raw analytics
-// reports: each worker's report carries the response count and mean handler time per path and
-// method for the second it covers. The raw table is never replicated, so the scan is bounded by
-// this node's workers, not the cluster. null when no report was written in the window.
+// The raw table is written per node and never replicated, so the scan is bounded by this node's
+// workers, not the cluster.
 async function getBusyFraction() {
 	const reports = await databases.system.hdb_raw_analytics.search({
 		conditions: [{ attribute: 'id', comparator: 'greater_than_equal', value: Date.now() - CONFIG.window }],

@@ -106,8 +106,9 @@ endpoint reports `max`, which takes the node out of GTM rotation. The same happe
 query fails. Entering and leaving this state is logged at `warn`, once per episode rather than once per
 poll. A node that is up but idle still has reports, from the polls themselves, and reads `load:0`.
 
-The response is cached for a sixth of the window (10s by default), since GTM's agents poll every 30s and
-the raw reports arrive every second.
+Each worker caches its value for half the window (30s by default), GTM's poll interval. A refresh decodes
+every report in the window; measured on a two-worker laptop at 200 active endpoints and 5,700 requests per
+second, that is 14 MB of reports and about 25 ms.
 
 ### GET /akamai/sureroute-test-object.html
 
@@ -128,6 +129,10 @@ akamaiStatus:
     max: 100000 # Reported when load cannot be measured, and the clamp on any reading (default: 100000)
     windowSeconds: 60 # Span of raw reports averaged per poll (default: analytics.aggregatePeriod)
 ```
+
+`windowSeconds` is clamped to at least 30s, GTM's poll interval, so an idle node always has a report in
+the window, and to at most `analytics.rawRetentionMs` (1 hour by default), so the window never divides by
+time core has already cleaned up; a clamped value is logged once at load.
 
 `scale` only sets the resolution of the number; GTM compares datacenters relative to each other. `max` is
 a fail-safe, not a working range: it is what a node reports when its analytics are missing, so GTM
