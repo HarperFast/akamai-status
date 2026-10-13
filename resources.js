@@ -31,7 +31,7 @@ const requestedWindowMs = positiveNumber(cfg.loadThresholds?.windowSeconds, aggr
 const windowMs = Math.min(Math.max(requestedWindowMs, Math.min(GTM_POLL_MS, retainedMs)), retainedMs);
 if (windowMs !== requestedWindowMs) {
 	logger.warn(
-		`akamai-status: load window of ${requestedWindowMs / 1000}s clamped to ${windowMs / 1000}s (between 30s and what analytics.rawRetentionMs keeps)`
+		`akamai-status: load window of ${requestedWindowMs / 1000}s clamped to ${windowMs / 1000}s (GTM polls every 30s; core keeps analytics.rawRetentionMs, at least one aggregation period)`
 	);
 }
 

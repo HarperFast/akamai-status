@@ -134,7 +134,8 @@ akamaiStatus:
 never less than one aggregation period), so the window never divides by time core has already cleaned up,
 and to at least 30s, GTM's poll interval, so an idle node always has a report in the window. When core
 retains less than 30s, because `analytics.aggregatePeriod` is itself shorter, the floor follows the retained
-span and an idle node can briefly read `max` between polls. A clamped value is logged once at load.
+span, and a node that receives nothing but GTM's polls reads `max` on every poll that finds no report in
+the window. A clamped value is logged once at load.
 
 `scale` only sets the resolution of the number; GTM compares datacenters relative to each other. `max` is
 a fail-safe, not a working range: it is what a node reports when its analytics are missing, so GTM
