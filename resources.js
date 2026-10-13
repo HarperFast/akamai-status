@@ -104,7 +104,6 @@ async function getBusyFraction() {
 		else busyMs += count * (mean || 0);
 		cyclePeriod ??= Number(record.period) || null;
 	}
-	if (malformed) throw new Error(malformed);
 	// A cycle writes its resource-usage row after its duration rows, requests or not, so a second
 	// one after the newest duration row means a later cycle ran and found no requests.
 	let usageRowsAfter = 0;
@@ -119,6 +118,7 @@ async function getBusyFraction() {
 	// than the window.
 	if (newestTime === null) return sawUsage ? 0 : null;
 	if (usageRowsAfter >= 2) return 0;
+	if (malformed) throw new Error(malformed);
 
 	const periodMs = cyclePeriod || aggregatePeriodSeconds * 1000;
 	return busyMs / periodMs / WORKER_COUNT;

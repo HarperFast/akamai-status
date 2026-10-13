@@ -597,6 +597,18 @@ describe('current_load_for_gtm', () => {
 		assert.equal(await loadBody(), 'load:400');
 	});
 
+	it('reports zero load when a later idle cycle superseded a malformed cycle', async () => {
+		// The malformed cycle is not this node's load any more; failing closed on it would take an idle
+		// node out of rotation.
+		operationHandler = forMetrics({
+			'duration': [{ ...durationRow('node-a', 200_000, 9_000, 2), mean: null }],
+			'resource-usage': [resourceUsageRow('node-a', 200_003), resourceUsageRow('node-a', 260_000)],
+		});
+
+		assert.equal(await loadBody(), 'load:0');
+		assert.equal(warnings.length, 0);
+	});
+
 	it('reports max load, not idle, when a duration row carries no cycle time', async () => {
 		const row = durationRow('node-a', 200_000, 9_000, 2);
 		delete row.time;
