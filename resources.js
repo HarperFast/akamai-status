@@ -18,20 +18,20 @@ if (!configuredWorkers) {
 	);
 }
 
+// Handler work is averaged over the last window: one aggregation period by default, the span the
+// aggregate rows describe, so the number means the same thing in both.
+const windowMs = positiveNumber(cfg.loadThresholds?.windowSeconds, aggregatePeriodSeconds) * 1000;
+
 const CONFIG = {
 	scale: positiveNumber(cfg.loadThresholds?.scale, 1000),
 	// Reported when load cannot be measured, so GTM shifts traffic away. The GTM resource's upper
 	// bound must be 0 or at least this value.
 	max: positiveNumber(cfg.loadThresholds?.max, 100000),
 	prefix: 'load:',
-	// Half an aggregation period: the underlying metric only moves once per period, so a shorter
-	// TTL just re-runs the scan — and `node` is resolved per row by an awaited table get in core,
-	// so each scan is proportional to the cluster's row count, not free.
-	cacheTtl: Math.max(500 * aggregatePeriodSeconds, 2000),
-	// Two aggregation periods, so a node that has just aggregated still has a row in range.
-	// Derived rather than hard-coded: an operator raising analytics.aggregatePeriod past a fixed
-	// window would otherwise push every node to max load permanently.
-	analyticsWindow: Math.max(2000 * aggregatePeriodSeconds, 120000),
+	window: windowMs,
+	// A worker flushes a report about once a second while it serves requests, so the value moves
+	// every second; GTM's agents poll every 30 s.
+	cacheTtl: Math.max(windowMs / 6, 2000),
 };
 
 let cachedLoad = null;
@@ -59,69 +59,34 @@ function clearDegraded() {
 	}
 }
 
-function queryMetric(metric, now) {
-	// Both bounds, so core pins the primary-key range instead of decoding the metric's whole history.
-	return server.operation({
-		operation: 'get_analytics',
-		metric,
-		start_time: now - CONFIG.analyticsWindow,
-		end_time: now,
-	});
-}
-
+// Handler work in flight per worker over the last window, from this node's own raw analytics
+// reports: each worker's report carries the response count and mean handler time per path and
+// method for the second it covers. The raw table is never replicated, so the scan is bounded by
+// this node's workers, not the cluster. null when no report was written in the window.
 async function getBusyFraction() {
-	// Analytics rows are attributed to server.hostname; replication.hostname can be unset.
-	const nodeName = server.hostname;
-	const now = Date.now();
-	const [durations, health] = await Promise.all([queryMetric('duration', now), queryMetric('resource-usage', now)]);
-
-	// Core stamps every duration row of a cycle with the cycle's time, so the newest time is the
-	// newest cycle however close together two cycles were written.
-	let newestTime = null;
-	let newestId = null;
-	let cyclePeriod = null;
+	const reports = await databases.system.hdb_raw_analytics.search({
+		conditions: [{ attribute: 'id', comparator: 'greater_than_equal', value: Date.now() - CONFIG.window }],
+	});
+	let sawReport = false;
 	let busyMs = 0;
-	let malformed = null;
-	for await (const record of durations) {
-		if (record.node !== nodeName) continue;
-		const time = Number(record.time);
-		if (!Number.isFinite(time)) throw new Error(`duration row for ${record.path} has no time`);
-		if (newestTime === null || time > newestTime) {
-			newestTime = time;
-			cyclePeriod = null;
-			busyMs = 0;
-			malformed = null;
+	for await (const report of reports) {
+		sawReport = true;
+		for (const entry of report.metrics ?? []) {
+			if (entry.metric !== 'duration') continue;
+			// An entry without a numeric count, or with responses but no mean, is a changed contract:
+			// fail closed rather than report idle.
+			const { count, mean } = entry;
+			if (typeof count !== 'number' || !Number.isFinite(count))
+				throw new Error(`duration entry for ${entry.path} has no count`);
+			if (count > 0 && (typeof mean !== 'number' || !Number.isFinite(mean)))
+				throw new Error(`duration entry for ${entry.path} has no mean`);
+			busyMs += count * (mean || 0);
 		}
-		if (newestId === null || record.id > newestId) newestId = record.id;
-		if (time !== newestTime) continue;
-		// A newest-cycle row without a numeric count, or with responses but no mean, is a changed
-		// contract: fail closed rather than report idle. Older cycles are not this node's load, so
-		// their rows are not judged.
-		const { count, mean } = record;
-		if (typeof count !== 'number' || !Number.isFinite(count)) malformed ??= `duration row for ${record.path} has no count`;
-		else if (count > 0 && (typeof mean !== 'number' || !Number.isFinite(mean)))
-			malformed ??= `duration row for ${record.path} has no mean`;
-		else busyMs += count * (mean || 0);
-		cyclePeriod ??= Number(record.period) || null;
 	}
-	// A cycle writes its resource-usage row after its duration rows, requests or not, so a second
-	// one after the newest duration row means a later cycle ran and found no requests.
-	let usageRowsAfter = 0;
-	let sawUsage = false;
-	for await (const record of health) {
-		if (record.node !== nodeName) continue;
-		sawUsage = true;
-		if (newestId !== null && record.id >= newestId) usageRowsAfter++;
-	}
-
-	// No rows of either metric: analytics are not being written, or this node was down for longer
-	// than the window.
-	if (newestTime === null) return sawUsage ? 0 : null;
-	if (usageRowsAfter >= 2) return 0;
-	if (malformed) throw new Error(malformed);
-
-	const periodMs = cyclePeriod || aggregatePeriodSeconds * 1000;
-	return busyMs / periodMs / WORKER_COUNT;
+	// Core writes a report only for a worker that recorded something, and GTM's own polls are
+	// requests, so a window without reports means analytics are not being written.
+	if (!sawReport) return null;
+	return busyMs / CONFIG.window / WORKER_COUNT;
 }
 
 async function computeLoad() {
@@ -135,7 +100,7 @@ async function computeLoad() {
 	if (busy === null) {
 		return reportMaxLoad(
 			'analytics-missing',
-			'no analytics rows for this node; check that analytics are being written and that node.hostname matches this node'
+			`no analytics reports in the last ${CONFIG.window / 1000}s; check that analytics are enabled and being written`
 		);
 	}
 

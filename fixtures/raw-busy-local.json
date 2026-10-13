@@ -1,0 +1,3094 @@
+[
+	{
+		"time": 1791903736195,
+		"period": 1001.3020000000006,
+		"threadId": 2,
+		"metrics": [
+			{
+				"metric": "db-write",
+				"path": "Probe",
+				"method": null,
+				"mean": 5,
+				"distribution": [
+					5
+				],
+				"count": 1
+			},
+			{
+				"metric": "transaction-commit-time",
+				"mean": 0.9835409999996045,
+				"distribution": [
+					0.9835410118103027
+				],
+				"count": 1
+			},
+			{
+				"metric": "duration",
+				"path": "Probe",
+				"method": "POST",
+				"mean": 9.818333000000166,
+				"distribution": [
+					9.81833267211914
+				],
+				"count": 1
+			},
+			{
+				"metric": "request-time",
+				"path": "Probe",
+				"method": "POST",
+				"mean": 10.899290999999721,
+				"distribution": [
+					10.899291038513184
+				],
+				"count": 1
+			},
+			{
+				"metric": "success",
+				"path": "Probe",
+				"method": "POST",
+				"total": 1,
+				"count": 1
+			},
+			{
+				"metric": "response_201",
+				"path": "Probe",
+				"method": "POST",
+				"total": 1,
+				"count": 1
+			},
+			{
+				"metric": "db-read",
+				"path": "Probe",
+				"method": null,
+				"mean": 21,
+				"distribution": [
+					{
+						"value": 21,
+						"count": 100
+					}
+				],
+				"count": 100
+			},
+			{
+				"metric": "duration",
+				"path": "Probe",
+				"method": "GET",
+				"mean": 0.20733916000001953,
+				"distribution": [
+					0.05445899814367294,
+					{
+						"value": 0.08708299696445465,
+						"count": 9
+					},
+					{
+						"value": 0.12370800226926804,
+						"count": 15
+					},
+					{
+						"value": 0.1767919957637787,
+						"count": 25
+					},
+					{
+						"value": 0.25224998593330383,
+						"count": 25
+					},
+					{
+						"value": 0.31474998593330383,
+						"count": 15
+					},
+					{
+						"value": 0.3779579997062683,
+						"count": 5
+					},
+					{
+						"value": 0.6132919788360596,
+						"count": 4
+					},
+					1.6520839929580688
+				],
+				"count": 100
+			},
+			{
+				"metric": "request-time",
+				"path": "Probe",
+				"method": "GET",
+				"mean": 0.23675249999999323,
+				"distribution": [
+					0.06274999678134918,
+					{
+						"value": 0.10137499868869781,
+						"count": 9
+					},
+					{
+						"value": 0.140625,
+						"count": 15
+					},
+					{
+						"value": 0.2029999941587448,
+						"count": 25
+					},
+					{
+						"value": 0.27595800161361694,
+						"count": 25
+					},
+					{
+						"value": 0.36158299446105957,
+						"count": 15
+					},
+					{
+						"value": 0.4256249964237213,
+						"count": 5
+					},
+					{
+						"value": 0.6710420250892639,
+						"count": 4
+					},
+					1.7287089824676514
+				],
+				"count": 100
+			},
+			{
+				"metric": "success",
+				"path": "Probe",
+				"method": "GET",
+				"total": 100,
+				"count": 100
+			},
+			{
+				"metric": "response_200",
+				"path": "Probe",
+				"method": "GET",
+				"total": 100,
+				"count": 100
+			},
+			{
+				"metric": "memory",
+				"threadId": 2,
+				"byThread": true,
+				"rss": 399343616,
+				"heapTotal": 79495168,
+				"heapUsed": 52293816,
+				"external": 22606410,
+				"arrayBuffers": 1268497
+			},
+			{
+				"metric": "event-loop-delay",
+				"threadId": 2,
+				"perThread": true,
+				"mean": 1.1203531034482772,
+				"maxDelay": 58.708735000000004,
+				"count": 232
+			},
+			{
+				"metric": "write-transaction-queue-depth",
+				"threadId": 2,
+				"byThread": true,
+				"depth": 0,
+				"maxDepth": 1
+			},
+			{
+				"metric": "read-transaction-queue-depth",
+				"threadId": 2,
+				"byThread": true,
+				"depth": 0,
+				"maxDepth": 1
+			},
+			{
+				"metric": "utilization",
+				"idle": 4701.376153,
+				"active": 429.1841799986332,
+				"utilization": 0.08365249644141502
+			}
+		],
+		"totalBytesProcessed": 0,
+		"id": 1791903736196.7346
+	},
+	{
+		"time": 1791903737333,
+		"period": 1000.2551249999997,
+		"threadId": 2,
+		"metrics": [
+			{
+				"metric": "db-read",
+				"path": "Probe",
+				"method": null,
+				"mean": 21,
+				"distribution": [
+					{
+						"value": 21,
+						"count": 100
+					}
+				],
+				"count": 100
+			},
+			{
+				"metric": "duration",
+				"path": "Probe",
+				"method": "GET",
+				"mean": 0.15510788999992656,
+				"distribution": [
+					0.03708299994468689,
+					{
+						"value": 0.05783399939537048,
+						"count": 9
+					},
+					{
+						"value": 0.0895410031080246,
+						"count": 15
+					},
+					{
+						"value": 0.13762499392032623,
+						"count": 25
+					},
+					{
+						"value": 0.20604200661182404,
+						"count": 25
+					},
+					{
+						"value": 0.2680419981479645,
+						"count": 15
+					},
+					{
+						"value": 0.31595900654792786,
+						"count": 5
+					},
+					{
+						"value": 0.3738749921321869,
+						"count": 4
+					},
+					0.5612080097198486
+				],
+				"count": 100
+			},
+			{
+				"metric": "request-time",
+				"path": "Probe",
+				"method": "GET",
+				"mean": 0.1800812799999767,
+				"distribution": [
+					0.04279100149869919,
+					{
+						"value": 0.06787499785423279,
+						"count": 9
+					},
+					{
+						"value": 0.10337500274181366,
+						"count": 15
+					},
+					{
+						"value": 0.1603340059518814,
+						"count": 25
+					},
+					{
+						"value": 0.23549999296665192,
+						"count": 25
+					},
+					{
+						"value": 0.3079589903354645,
+						"count": 15
+					},
+					{
+						"value": 0.350832998752594,
+						"count": 5
+					},
+					{
+						"value": 0.41345900297164917,
+						"count": 4
+					},
+					0.6007500290870667
+				],
+				"count": 100
+			},
+			{
+				"metric": "success",
+				"path": "Probe",
+				"method": "GET",
+				"total": 100,
+				"count": 100
+			},
+			{
+				"metric": "response_200",
+				"path": "Probe",
+				"method": "GET",
+				"total": 100,
+				"count": 100
+			},
+			{
+				"metric": "memory",
+				"threadId": 2,
+				"byThread": true,
+				"rss": 404258816,
+				"heapTotal": 81330176,
+				"heapUsed": 43998856,
+				"external": 22601840,
+				"arrayBuffers": 1263927
+			},
+			{
+				"metric": "event-loop-delay",
+				"threadId": 2,
+				"perThread": true,
+				"mean": 0.7494257777777769,
+				"maxDelay": 1.643263000000001,
+				"count": 54
+			},
+			{
+				"metric": "write-transaction-queue-depth",
+				"threadId": 2,
+				"byThread": true,
+				"depth": 0,
+				"maxDepth": 0
+			},
+			{
+				"metric": "read-transaction-queue-depth",
+				"threadId": 2,
+				"byThread": true,
+				"depth": 0,
+				"maxDepth": 1
+			},
+			{
+				"metric": "utilization",
+				"idle": 1077.6113749999995,
+				"active": 59.13837499576857,
+				"utilization": 0.05202409325006558
+			}
+		],
+		"totalBytesProcessed": 0,
+		"id": 1791903737333.4878
+	},
+	{
+		"time": 1791903738441,
+		"period": 1000.9877500000002,
+		"threadId": 2,
+		"metrics": [
+			{
+				"metric": "db-read",
+				"path": "Probe",
+				"method": null,
+				"mean": 21,
+				"distribution": [
+					{
+						"value": 21,
+						"count": 100
+					}
+				],
+				"count": 100
+			},
+			{
+				"metric": "duration",
+				"path": "Probe",
+				"method": "GET",
+				"mean": 0.16143878000011683,
+				"distribution": [
+					0.029834000393748283,
+					{
+						"value": 0.0598750002682209,
+						"count": 9
+					},
+					{
+						"value": 0.08974999934434891,
+						"count": 15
+					},
+					{
+						"value": 0.15962499380111694,
+						"count": 25
+					},
+					{
+						"value": 0.20724999904632568,
+						"count": 25
+					},
+					{
+						"value": 0.2592499852180481,
+						"count": 15
+					},
+					{
+						"value": 0.296083003282547,
+						"count": 5
+					},
+					{
+						"value": 0.43595901131629944,
+						"count": 4
+					},
+					0.4520829916000366
+				],
+				"count": 100
+			},
+			{
+				"metric": "request-time",
+				"path": "Probe",
+				"method": "GET",
+				"mean": 0.1839971100000912,
+				"distribution": [
+					0.03433400020003319,
+					{
+						"value": 0.06916700303554535,
+						"count": 9
+					},
+					{
+						"value": 0.10275000333786011,
+						"count": 15
+					},
+					{
+						"value": 0.1807910054922104,
+						"count": 25
+					},
+					{
+						"value": 0.2309579998254776,
+						"count": 25
+					},
+					{
+						"value": 0.29145801067352295,
+						"count": 15
+					},
+					{
+						"value": 0.32295799255371094,
+						"count": 5
+					},
+					{
+						"value": 0.4676249921321869,
+						"count": 4
+					},
+					0.5333330035209656
+				],
+				"count": 100
+			},
+			{
+				"metric": "success",
+				"path": "Probe",
+				"method": "GET",
+				"total": 100,
+				"count": 100
+			},
+			{
+				"metric": "response_200",
+				"path": "Probe",
+				"method": "GET",
+				"total": 100,
+				"count": 100
+			},
+			{
+				"metric": "memory",
+				"threadId": 2,
+				"byThread": true,
+				"rss": 404340736,
+				"heapTotal": 81330176,
+				"heapUsed": 47742336,
+				"external": 22604528,
+				"arrayBuffers": 1266615
+			},
+			{
+				"metric": "event-loop-delay",
+				"threadId": 2,
+				"perThread": true,
+				"mean": 0.8776270769230763,
+				"maxDelay": 1.921790999999999,
+				"count": 52
+			},
+			{
+				"metric": "write-transaction-queue-depth",
+				"threadId": 2,
+				"byThread": true,
+				"depth": 0,
+				"maxDepth": 0
+			},
+			{
+				"metric": "read-transaction-queue-depth",
+				"threadId": 2,
+				"byThread": true,
+				"depth": 0,
+				"maxDepth": 1
+			},
+			{
+				"metric": "utilization",
+				"idle": 1065.0192529999995,
+				"active": 43.54512200566296,
+				"utilization": 0.03928064349482684
+			}
+		],
+		"totalBytesProcessed": 0,
+		"id": 1791903738442.0742
+	},
+	{
+		"time": 1791903739554,
+		"period": 1000.9796659999993,
+		"threadId": 2,
+		"metrics": [
+			{
+				"metric": "db-read",
+				"path": "Probe",
+				"method": null,
+				"mean": 21,
+				"distribution": [
+					{
+						"value": 21,
+						"count": 100
+					}
+				],
+				"count": 100
+			},
+			{
+				"metric": "duration",
+				"path": "Probe",
+				"method": "GET",
+				"mean": 0.14818411999989622,
+				"distribution": [
+					0.03758300095796585,
+					{
+						"value": 0.06391700357198715,
+						"count": 9
+					},
+					{
+						"value": 0.08733300119638443,
+						"count": 15
+					},
+					{
+						"value": 0.13645899295806885,
+						"count": 25
+					},
+					{
+						"value": 0.186832994222641,
+						"count": 25
+					},
+					{
+						"value": 0.2340410053730011,
+						"count": 15
+					},
+					{
+						"value": 0.2680419981479645,
+						"count": 5
+					},
+					{
+						"value": 0.43312498927116394,
+						"count": 4
+					},
+					0.45283299684524536
+				],
+				"count": 100
+			},
+			{
+				"metric": "request-time",
+				"path": "Probe",
+				"method": "GET",
+				"mean": 0.167868299999991,
+				"distribution": [
+					0.0437919981777668,
+					{
+						"value": 0.07474999874830246,
+						"count": 9
+					},
+					{
+						"value": 0.10079199820756912,
+						"count": 15
+					},
+					{
+						"value": 0.1581670045852661,
+						"count": 25
+					},
+					{
+						"value": 0.2129170000553131,
+						"count": 25
+					},
+					{
+						"value": 0.2520830035209656,
+						"count": 15
+					},
+					{
+						"value": 0.29795798659324646,
+						"count": 5
+					},
+					{
+						"value": 0.45895901322364807,
+						"count": 4
+					},
+					0.4967080056667328
+				],
+				"count": 100
+			},
+			{
+				"metric": "success",
+				"path": "Probe",
+				"method": "GET",
+				"total": 100,
+				"count": 100
+			},
+			{
+				"metric": "response_200",
+				"path": "Probe",
+				"method": "GET",
+				"total": 100,
+				"count": 100
+			},
+			{
+				"metric": "memory",
+				"threadId": 2,
+				"byThread": true,
+				"rss": 371818496,
+				"heapTotal": 81330176,
+				"heapUsed": 51395984,
+				"external": 22607216,
+				"arrayBuffers": 1269303
+			},
+			{
+				"metric": "event-loop-delay",
+				"threadId": 2,
+				"perThread": true,
+				"mean": 0.8585322264150932,
+				"maxDelay": 1.9054070000000003,
+				"count": 53
+			},
+			{
+				"metric": "write-transaction-queue-depth",
+				"threadId": 2,
+				"byThread": true,
+				"depth": 0,
+				"maxDepth": 0
+			},
+			{
+				"metric": "read-transaction-queue-depth",
+				"threadId": 2,
+				"byThread": true,
+				"depth": 0,
+				"maxDepth": 1
+			},
+			{
+				"metric": "utilization",
+				"idle": 1071.3023749999993,
+				"active": 41.576708998502,
+				"utilization": 0.03735959242680671
+			}
+		],
+		"totalBytesProcessed": 0,
+		"id": 1791903739554.9634
+	},
+	{
+		"time": 1791903740668,
+		"period": 999.631292,
+		"threadId": 2,
+		"metrics": [
+			{
+				"metric": "db-read",
+				"path": "Probe",
+				"method": null,
+				"mean": 21,
+				"distribution": [
+					{
+						"value": 21,
+						"count": 100
+					}
+				],
+				"count": 100
+			},
+			{
+				"metric": "duration",
+				"path": "Probe",
+				"method": "GET",
+				"mean": 0.1442716599999949,
+				"distribution": [
+					0.02762500010430813,
+					{
+						"value": 0.061250001192092896,
+						"count": 9
+					},
+					{
+						"value": 0.08316600322723389,
+						"count": 15
+					},
+					{
+						"value": 0.13883300125598907,
+						"count": 25
+					},
+					{
+						"value": 0.17954100668430328,
+						"count": 25
+					},
+					{
+						"value": 0.24887500703334808,
+						"count": 15
+					},
+					{
+						"value": 0.2809160053730011,
+						"count": 5
+					},
+					{
+						"value": 0.32850000262260437,
+						"count": 4
+					},
+					0.4420410096645355
+				],
+				"count": 100
+			},
+			{
+				"metric": "request-time",
+				"path": "Probe",
+				"method": "GET",
+				"mean": 0.16414329999992333,
+				"distribution": [
+					0.03150000050663948,
+					{
+						"value": 0.07212500274181366,
+						"count": 9
+					},
+					{
+						"value": 0.1002499982714653,
+						"count": 15
+					},
+					{
+						"value": 0.15629200637340546,
+						"count": 25
+					},
+					{
+						"value": 0.2071249932050705,
+						"count": 25
+					},
+					{
+						"value": 0.2715420126914978,
+						"count": 15
+					},
+					{
+						"value": 0.2991659939289093,
+						"count": 5
+					},
+					{
+						"value": 0.36149999499320984,
+						"count": 4
+					},
+					0.47270798683166504
+				],
+				"count": 100
+			},
+			{
+				"metric": "success",
+				"path": "Probe",
+				"method": "GET",
+				"total": 100,
+				"count": 100
+			},
+			{
+				"metric": "response_200",
+				"path": "Probe",
+				"method": "GET",
+				"total": 100,
+				"count": 100
+			},
+			{
+				"metric": "memory",
+				"threadId": 2,
+				"byThread": true,
+				"rss": 371752960,
+				"heapTotal": 81330176,
+				"heapUsed": 55110800,
+				"external": 22609904,
+				"arrayBuffers": 1271991
+			},
+			{
+				"metric": "event-loop-delay",
+				"threadId": 2,
+				"perThread": true,
+				"mean": 0.8590375384615392,
+				"maxDelay": 1.0862070000000017,
+				"count": 52
+			},
+			{
+				"metric": "write-transaction-queue-depth",
+				"threadId": 2,
+				"byThread": true,
+				"depth": 0,
+				"maxDepth": 0
+			},
+			{
+				"metric": "read-transaction-queue-depth",
+				"threadId": 2,
+				"byThread": true,
+				"depth": 0,
+				"maxDepth": 1
+			},
+			{
+				"metric": "utilization",
+				"idle": 1074.664535,
+				"active": 39.07125699612152,
+				"utilization": 0.035081261890753335
+			}
+		],
+		"totalBytesProcessed": 0,
+		"id": 1791903740668.7078
+	},
+	{
+		"time": 1791903741778,
+		"period": 999.9033749999999,
+		"threadId": 2,
+		"metrics": [
+			{
+				"metric": "db-read",
+				"path": "Probe",
+				"method": null,
+				"mean": 21,
+				"distribution": [
+					{
+						"value": 21,
+						"count": 100
+					}
+				],
+				"count": 100
+			},
+			{
+				"metric": "duration",
+				"path": "Probe",
+				"method": "GET",
+				"mean": 0.14127132000008713,
+				"distribution": [
+					0.023917000740766525,
+					{
+						"value": 0.0442500002682209,
+						"count": 9
+					},
+					{
+						"value": 0.0725409984588623,
+						"count": 15
+					},
+					{
+						"value": 0.12570799887180328,
+						"count": 25
+					},
+					{
+						"value": 0.1861249953508377,
+						"count": 25
+					},
+					{
+						"value": 0.22995799779891968,
+						"count": 15
+					},
+					{
+						"value": 0.2853339910507202,
+						"count": 5
+					},
+					{
+						"value": 0.4151659905910492,
+						"count": 4
+					},
+					0.6159579753875732
+				],
+				"count": 100
+			},
+			{
+				"metric": "request-time",
+				"path": "Probe",
+				"method": "GET",
+				"mean": 0.16016750999997384,
+				"distribution": [
+					0.026791999116539955,
+					{
+						"value": 0.048875000327825546,
+						"count": 9
+					},
+					{
+						"value": 0.07866600155830383,
+						"count": 15
+					},
+					{
+						"value": 0.14350000023841858,
+						"count": 25
+					},
+					{
+						"value": 0.21129199862480164,
+						"count": 25
+					},
+					{
+						"value": 0.2614159882068634,
+						"count": 15
+					},
+					{
+						"value": 0.318915992975235,
+						"count": 5
+					},
+					{
+						"value": 0.4666669964790344,
+						"count": 4
+					},
+					0.675707995891571
+				],
+				"count": 100
+			},
+			{
+				"metric": "success",
+				"path": "Probe",
+				"method": "GET",
+				"total": 100,
+				"count": 100
+			},
+			{
+				"metric": "response_200",
+				"path": "Probe",
+				"method": "GET",
+				"total": 100,
+				"count": 100
+			},
+			{
+				"metric": "memory",
+				"threadId": 2,
+				"byThread": true,
+				"rss": 382648320,
+				"heapTotal": 81854464,
+				"heapUsed": 48867776,
+				"external": 22603824,
+				"arrayBuffers": 1265911
+			},
+			{
+				"metric": "event-loop-delay",
+				"threadId": 2,
+				"perThread": true,
+				"mean": 0.8124715471698103,
+				"maxDelay": 2.3969270000000016,
+				"count": 53
+			},
+			{
+				"metric": "write-transaction-queue-depth",
+				"threadId": 2,
+				"byThread": true,
+				"depth": 0,
+				"maxDepth": 0
+			},
+			{
+				"metric": "read-transaction-queue-depth",
+				"threadId": 2,
+				"byThread": true,
+				"depth": 0,
+				"maxDepth": 1
+			},
+			{
+				"metric": "utilization",
+				"idle": 1064.9773760000007,
+				"active": 44.244666001783116,
+				"utilization": 0.03988801549772301
+			}
+		],
+		"totalBytesProcessed": 0,
+		"id": 1791903741777.9343
+	},
+	{
+		"time": 1791903742888,
+		"period": 1000.3457079999989,
+		"threadId": 2,
+		"metrics": [
+			{
+				"metric": "db-read",
+				"path": "Probe",
+				"method": null,
+				"mean": 21,
+				"distribution": [
+					{
+						"value": 21,
+						"count": 100
+					}
+				],
+				"count": 100
+			},
+			{
+				"metric": "duration",
+				"path": "Probe",
+				"method": "GET",
+				"mean": 0.11947091000007276,
+				"distribution": [
+					0.018709000200033188,
+					{
+						"value": 0.03212499991059303,
+						"count": 9
+					},
+					{
+						"value": 0.054917000234127045,
+						"count": 15
+					},
+					{
+						"value": 0.11841700226068497,
+						"count": 25
+					},
+					{
+						"value": 0.15945899486541748,
+						"count": 25
+					},
+					{
+						"value": 0.21758300065994263,
+						"count": 15
+					},
+					{
+						"value": 0.23708400130271912,
+						"count": 5
+					},
+					{
+						"value": 0.28712499141693115,
+						"count": 4
+					},
+					0.3380419909954071
+				],
+				"count": 100
+			},
+			{
+				"metric": "request-time",
+				"path": "Probe",
+				"method": "GET",
+				"mean": 0.13215170000006765,
+				"distribution": [
+					0.020917000249028206,
+					{
+						"value": 0.03691700100898743,
+						"count": 9
+					},
+					{
+						"value": 0.06400000303983688,
+						"count": 15
+					},
+					{
+						"value": 0.13375000655651093,
+						"count": 25
+					},
+					{
+						"value": 0.1738329976797104,
+						"count": 25
+					},
+					{
+						"value": 0.23854100704193115,
+						"count": 15
+					},
+					{
+						"value": 0.26350000500679016,
+						"count": 5
+					},
+					{
+						"value": 0.3057500123977661,
+						"count": 4
+					},
+					0.3730419874191284
+				],
+				"count": 100
+			},
+			{
+				"metric": "success",
+				"path": "Probe",
+				"method": "GET",
+				"total": 100,
+				"count": 100
+			},
+			{
+				"metric": "response_200",
+				"path": "Probe",
+				"method": "GET",
+				"total": 100,
+				"count": 100
+			},
+			{
+				"metric": "memory",
+				"threadId": 2,
+				"byThread": true,
+				"rss": 382795776,
+				"heapTotal": 82116608,
+				"heapUsed": 52517392,
+				"external": 22606512,
+				"arrayBuffers": 1268599
+			},
+			{
+				"metric": "event-loop-delay",
+				"threadId": 2,
+				"perThread": true,
+				"mean": 0.7843643076923072,
+				"maxDelay": 1.9873270000000005,
+				"count": 52
+			},
+			{
+				"metric": "write-transaction-queue-depth",
+				"threadId": 2,
+				"byThread": true,
+				"depth": 0,
+				"maxDepth": 0
+			},
+			{
+				"metric": "read-transaction-queue-depth",
+				"threadId": 2,
+				"byThread": true,
+				"depth": 0,
+				"maxDepth": 1
+			},
+			{
+				"metric": "utilization",
+				"idle": 1077.163199999999,
+				"active": 33.46254999779558,
+				"utilization": 0.03012945629782312
+			}
+		],
+		"totalBytesProcessed": 0,
+		"id": 1791903742888.5703
+	},
+	{
+		"time": 1791903743999,
+		"period": 1001.6842090000009,
+		"threadId": 2,
+		"metrics": [
+			{
+				"metric": "db-read",
+				"path": "Probe",
+				"method": null,
+				"mean": 21,
+				"distribution": [
+					{
+						"value": 21,
+						"count": 100
+					}
+				],
+				"count": 100
+			},
+			{
+				"metric": "duration",
+				"path": "Probe",
+				"method": "GET",
+				"mean": 0.11314416999997774,
+				"distribution": [
+					0.01912499964237213,
+					{
+						"value": 0.026374999433755875,
+						"count": 9
+					},
+					{
+						"value": 0.04774999991059303,
+						"count": 15
+					},
+					{
+						"value": 0.1054999977350235,
+						"count": 25
+					},
+					{
+						"value": 0.1543329954147339,
+						"count": 25
+					},
+					{
+						"value": 0.1857919991016388,
+						"count": 15
+					},
+					{
+						"value": 0.2415419965982437,
+						"count": 5
+					},
+					{
+						"value": 0.32749998569488525,
+						"count": 4
+					},
+					0.43516701459884644
+				],
+				"count": 100
+			},
+			{
+				"metric": "request-time",
+				"path": "Probe",
+				"method": "GET",
+				"mean": 0.1279549699999734,
+				"distribution": [
+					0.02187499962747097,
+					{
+						"value": 0.032540999352931976,
+						"count": 9
+					},
+					{
+						"value": 0.06137499958276749,
+						"count": 15
+					},
+					{
+						"value": 0.11920899897813797,
+						"count": 25
+					},
+					{
+						"value": 0.17033399641513824,
+						"count": 25
+					},
+					{
+						"value": 0.21199999749660492,
+						"count": 15
+					},
+					{
+						"value": 0.2770000100135803,
+						"count": 5
+					},
+					{
+						"value": 0.3665409982204437,
+						"count": 4
+					},
+					0.45166701078414917
+				],
+				"count": 100
+			},
+			{
+				"metric": "success",
+				"path": "Probe",
+				"method": "GET",
+				"total": 100,
+				"count": 100
+			},
+			{
+				"metric": "response_200",
+				"path": "Probe",
+				"method": "GET",
+				"total": 100,
+				"count": 100
+			},
+			{
+				"metric": "memory",
+				"threadId": 2,
+				"byThread": true,
+				"rss": 382812160,
+				"heapTotal": 82116608,
+				"heapUsed": 55969688,
+				"external": 22609200,
+				"arrayBuffers": 1271287
+			},
+			{
+				"metric": "event-loop-delay",
+				"threadId": 2,
+				"perThread": true,
+				"mean": 0.9255187692307665,
+				"maxDelay": 1.2008949999999992,
+				"count": 52
+			},
+			{
+				"metric": "write-transaction-queue-depth",
+				"threadId": 2,
+				"byThread": true,
+				"depth": 0,
+				"maxDepth": 0
+			},
+			{
+				"metric": "read-transaction-queue-depth",
+				"threadId": 2,
+				"byThread": true,
+				"depth": 0,
+				"maxDepth": 1
+			},
+			{
+				"metric": "utilization",
+				"idle": 1076.9378190000007,
+				"active": 33.780055996363444,
+				"utilization": 0.03041281387181603
+			}
+		],
+		"totalBytesProcessed": 0,
+		"id": 1791903743999.2944
+	},
+	{
+		"time": 1791903745112,
+		"period": 1001.0602919999983,
+		"threadId": 2,
+		"metrics": [
+			{
+				"metric": "db-read",
+				"path": "Probe",
+				"method": null,
+				"mean": 21,
+				"distribution": [
+					{
+						"value": 21,
+						"count": 100
+					}
+				],
+				"count": 100
+			},
+			{
+				"metric": "duration",
+				"path": "Probe",
+				"method": "GET",
+				"mean": 0.10068211999991035,
+				"distribution": [
+					0.01845799945294857,
+					{
+						"value": 0.031957998871803284,
+						"count": 9
+					},
+					{
+						"value": 0.04691699892282486,
+						"count": 15
+					},
+					{
+						"value": 0.08383399993181229,
+						"count": 25
+					},
+					{
+						"value": 0.1367499977350235,
+						"count": 25
+					},
+					{
+						"value": 0.18537500500679016,
+						"count": 15
+					},
+					{
+						"value": 0.20320899784564972,
+						"count": 5
+					},
+					{
+						"value": 0.2545830011367798,
+						"count": 4
+					},
+					0.3184170126914978
+				],
+				"count": 100
+			},
+			{
+				"metric": "request-time",
+				"path": "Probe",
+				"method": "GET",
+				"mean": 0.1147387499999968,
+				"distribution": [
+					0.020500000566244125,
+					{
+						"value": 0.035624999552965164,
+						"count": 9
+					},
+					{
+						"value": 0.05037499964237213,
+						"count": 15
+					},
+					{
+						"value": 0.09724999964237213,
+						"count": 25
+					},
+					{
+						"value": 0.16691599786281586,
+						"count": 25
+					},
+					{
+						"value": 0.2105419933795929,
+						"count": 15
+					},
+					{
+						"value": 0.2292499989271164,
+						"count": 5
+					},
+					{
+						"value": 0.27541598677635193,
+						"count": 4
+					},
+					0.3477090001106262
+				],
+				"count": 100
+			},
+			{
+				"metric": "success",
+				"path": "Probe",
+				"method": "GET",
+				"total": 100,
+				"count": 100
+			},
+			{
+				"metric": "response_200",
+				"path": "Probe",
+				"method": "GET",
+				"total": 100,
+				"count": 100
+			},
+			{
+				"metric": "memory",
+				"threadId": 2,
+				"byThread": true,
+				"rss": 350355456,
+				"heapTotal": 46465024,
+				"heapUsed": 41310288,
+				"external": 22600672,
+				"arrayBuffers": 1262759
+			},
+			{
+				"metric": "event-loop-delay",
+				"threadId": 2,
+				"perThread": true,
+				"mean": 0.7704295849056599,
+				"maxDelay": 1.921790999999999,
+				"count": 53
+			},
+			{
+				"metric": "write-transaction-queue-depth",
+				"threadId": 2,
+				"byThread": true,
+				"depth": 0,
+				"maxDepth": 0
+			},
+			{
+				"metric": "read-transaction-queue-depth",
+				"threadId": 2,
+				"byThread": true,
+				"depth": 0,
+				"maxDepth": 1
+			},
+			{
+				"metric": "utilization",
+				"idle": 1051.0385019999994,
+				"active": 62.21195700046883,
+				"utilization": 0.05588316312604607
+			}
+		],
+		"totalBytesProcessed": 0,
+		"id": 1791903745112.5437
+	},
+	{
+		"time": 1791903746224,
+		"period": 1001.2728329999991,
+		"threadId": 2,
+		"metrics": [
+			{
+				"metric": "db-read",
+				"path": "Probe",
+				"method": null,
+				"mean": 21,
+				"distribution": [
+					{
+						"value": 21,
+						"count": 100
+					}
+				],
+				"count": 100
+			},
+			{
+				"metric": "duration",
+				"path": "Probe",
+				"method": "GET",
+				"mean": 0.15155668999981572,
+				"distribution": [
+					0.027333000674843788,
+					{
+						"value": 0.05870800092816353,
+						"count": 9
+					},
+					{
+						"value": 0.09220799803733826,
+						"count": 15
+					},
+					{
+						"value": 0.13816699385643005,
+						"count": 25
+					},
+					{
+						"value": 0.19349999725818634,
+						"count": 25
+					},
+					{
+						"value": 0.2290000021457672,
+						"count": 15
+					},
+					{
+						"value": 0.304082989692688,
+						"count": 5
+					},
+					{
+						"value": 0.3908340036869049,
+						"count": 4
+					},
+					0.8632919788360596
+				],
+				"count": 100
+			},
+			{
+				"metric": "request-time",
+				"path": "Probe",
+				"method": "GET",
+				"mean": 0.1754391599999508,
+				"distribution": [
+					0.03183300048112869,
+					{
+						"value": 0.06945899873971939,
+						"count": 9
+					},
+					{
+						"value": 0.1067499965429306,
+						"count": 15
+					},
+					{
+						"value": 0.15904100239276886,
+						"count": 25
+					},
+					{
+						"value": 0.22224999964237213,
+						"count": 25
+					},
+					{
+						"value": 0.2702920138835907,
+						"count": 15
+					},
+					{
+						"value": 0.33616700768470764,
+						"count": 5
+					},
+					{
+						"value": 0.42329201102256775,
+						"count": 4
+					},
+					1.1282919645309448
+				],
+				"count": 100
+			},
+			{
+				"metric": "success",
+				"path": "Probe",
+				"method": "GET",
+				"total": 100,
+				"count": 100
+			},
+			{
+				"metric": "response_200",
+				"path": "Probe",
+				"method": "GET",
+				"total": 100,
+				"count": 100
+			},
+			{
+				"metric": "memory",
+				"threadId": 2,
+				"byThread": true,
+				"rss": 353566720,
+				"heapTotal": 49872896,
+				"heapUsed": 43052696,
+				"external": 22602976,
+				"arrayBuffers": 1265063
+			},
+			{
+				"metric": "event-loop-delay",
+				"threadId": 2,
+				"perThread": true,
+				"mean": 0.7317464615384601,
+				"maxDelay": 1.8726389999999995,
+				"count": 52
+			},
+			{
+				"metric": "write-transaction-queue-depth",
+				"threadId": 2,
+				"byThread": true,
+				"depth": 0,
+				"maxDepth": 0
+			},
+			{
+				"metric": "read-transaction-queue-depth",
+				"threadId": 2,
+				"byThread": true,
+				"depth": 0,
+				"maxDepth": 1
+			},
+			{
+				"metric": "utilization",
+				"idle": 1068.1259119999995,
+				"active": 44.39904699796534,
+				"utilization": 0.03990836038227396
+			}
+		],
+		"totalBytesProcessed": 0,
+		"id": 1791903746225.0818
+	},
+	{
+		"time": 1791903747332,
+		"period": 1000.0304169999981,
+		"threadId": 2,
+		"metrics": [
+			{
+				"metric": "db-read",
+				"path": "Probe",
+				"method": null,
+				"mean": 21,
+				"distribution": [
+					{
+						"value": 21,
+						"count": 100
+					}
+				],
+				"count": 100
+			},
+			{
+				"metric": "duration",
+				"path": "Probe",
+				"method": "GET",
+				"mean": 0.14737541000009513,
+				"distribution": [
+					0.03525000065565109,
+					{
+						"value": 0.05849999934434891,
+						"count": 9
+					},
+					{
+						"value": 0.08308299630880356,
+						"count": 15
+					},
+					{
+						"value": 0.15441599488258362,
+						"count": 25
+					},
+					{
+						"value": 0.196833997964859,
+						"count": 25
+					},
+					{
+						"value": 0.23899999260902405,
+						"count": 15
+					},
+					{
+						"value": 0.27491599321365356,
+						"count": 5
+					},
+					{
+						"value": 0.31575000286102295,
+						"count": 4
+					},
+					0.3550420105457306
+				],
+				"count": 100
+			},
+			{
+				"metric": "request-time",
+				"path": "Probe",
+				"method": "GET",
+				"mean": 0.17131828999998105,
+				"distribution": [
+					0.04054100066423416,
+					{
+						"value": 0.06779100000858307,
+						"count": 9
+					},
+					{
+						"value": 0.10158299654722214,
+						"count": 15
+					},
+					{
+						"value": 0.17441700398921967,
+						"count": 25
+					},
+					{
+						"value": 0.21549999713897705,
+						"count": 25
+					},
+					{
+						"value": 0.26600000262260437,
+						"count": 15
+					},
+					{
+						"value": 0.3032500147819519,
+						"count": 5
+					},
+					{
+						"value": 0.3725830018520355,
+						"count": 4
+					},
+					0.4091250002384186
+				],
+				"count": 100
+			},
+			{
+				"metric": "success",
+				"path": "Probe",
+				"method": "GET",
+				"total": 100,
+				"count": 100
+			},
+			{
+				"metric": "response_200",
+				"path": "Probe",
+				"method": "GET",
+				"total": 100,
+				"count": 100
+			},
+			{
+				"metric": "memory",
+				"threadId": 2,
+				"byThread": true,
+				"rss": 353976320,
+				"heapTotal": 54067200,
+				"heapUsed": 43314128,
+				"external": 22603768,
+				"arrayBuffers": 1265855
+			},
+			{
+				"metric": "event-loop-delay",
+				"threadId": 2,
+				"perThread": true,
+				"mean": 0.8093802264150938,
+				"maxDelay": 1.1353590000000011,
+				"count": 53
+			},
+			{
+				"metric": "write-transaction-queue-depth",
+				"threadId": 2,
+				"byThread": true,
+				"depth": 0,
+				"maxDepth": 0
+			},
+			{
+				"metric": "read-transaction-queue-depth",
+				"threadId": 2,
+				"byThread": true,
+				"depth": 0,
+				"maxDepth": 1
+			},
+			{
+				"metric": "utilization",
+				"idle": 1062.8040870000004,
+				"active": 44.00691299695973,
+				"utilization": 0.039760097249738745
+			}
+		],
+		"totalBytesProcessed": 0,
+		"id": 1791903747331.9011
+	},
+	{
+		"time": 1791903748441,
+		"period": 1001.0972079999992,
+		"threadId": 2,
+		"metrics": [
+			{
+				"metric": "db-read",
+				"path": "Probe",
+				"method": null,
+				"mean": 21,
+				"distribution": [
+					{
+						"value": 21,
+						"count": 100
+					}
+				],
+				"count": 100
+			},
+			{
+				"metric": "duration",
+				"path": "Probe",
+				"method": "GET",
+				"mean": 0.15023868000014773,
+				"distribution": [
+					0.028958000242710114,
+					{
+						"value": 0.052041999995708466,
+						"count": 9
+					},
+					{
+						"value": 0.08683399856090546,
+						"count": 15
+					},
+					{
+						"value": 0.1377909928560257,
+						"count": 25
+					},
+					{
+						"value": 0.186832994222641,
+						"count": 25
+					},
+					{
+						"value": 0.24879099428653717,
+						"count": 15
+					},
+					{
+						"value": 0.28224998712539673,
+						"count": 5
+					},
+					{
+						"value": 0.3937079906463623,
+						"count": 4
+					},
+					0.6477910280227661
+				],
+				"count": 100
+			},
+			{
+				"metric": "request-time",
+				"path": "Probe",
+				"method": "GET",
+				"mean": 0.17377868999999918,
+				"distribution": [
+					0.03350000083446503,
+					{
+						"value": 0.06224999949336052,
+						"count": 9
+					},
+					{
+						"value": 0.10433299839496613,
+						"count": 15
+					},
+					{
+						"value": 0.1595419943332672,
+						"count": 25
+					},
+					{
+						"value": 0.21420800685882568,
+						"count": 25
+					},
+					{
+						"value": 0.2782920002937317,
+						"count": 15
+					},
+					{
+						"value": 0.31575000286102295,
+						"count": 5
+					},
+					{
+						"value": 0.4154999852180481,
+						"count": 4
+					},
+					0.6560829877853394
+				],
+				"count": 100
+			},
+			{
+				"metric": "success",
+				"path": "Probe",
+				"method": "GET",
+				"total": 100,
+				"count": 100
+			},
+			{
+				"metric": "response_200",
+				"path": "Probe",
+				"method": "GET",
+				"total": 100,
+				"count": 100
+			},
+			{
+				"metric": "memory",
+				"threadId": 2,
+				"byThread": true,
+				"rss": 355549184,
+				"heapTotal": 54067200,
+				"heapUsed": 44311848,
+				"external": 22606456,
+				"arrayBuffers": 1267367
+			},
+			{
+				"metric": "event-loop-delay",
+				"threadId": 2,
+				"perThread": true,
+				"mean": 0.7793230769230775,
+				"maxDelay": 1.823487,
+				"count": 52
+			},
+			{
+				"metric": "write-transaction-queue-depth",
+				"threadId": 2,
+				"byThread": true,
+				"depth": 0,
+				"maxDepth": 0
+			},
+			{
+				"metric": "read-transaction-queue-depth",
+				"threadId": 2,
+				"byThread": true,
+				"depth": 0,
+				"maxDepth": 1
+			},
+			{
+				"metric": "utilization",
+				"idle": 1068.8960050000005,
+				"active": 40.574953001911126,
+				"utilization": 0.036571442189874084
+			}
+		],
+		"totalBytesProcessed": 0,
+		"id": 1791903748441.3794
+	},
+	{
+		"time": 1791903749556,
+		"period": 1001.1267919999991,
+		"threadId": 2,
+		"metrics": [
+			{
+				"metric": "db-read",
+				"path": "Probe",
+				"method": null,
+				"mean": 21,
+				"distribution": [
+					{
+						"value": 21,
+						"count": 100
+					}
+				],
+				"count": 100
+			},
+			{
+				"metric": "duration",
+				"path": "Probe",
+				"method": "GET",
+				"mean": 0.14879969000012352,
+				"distribution": [
+					0.029541999101638794,
+					{
+						"value": 0.06129100173711777,
+						"count": 9
+					},
+					{
+						"value": 0.08275000005960464,
+						"count": 15
+					},
+					{
+						"value": 0.13645899295806885,
+						"count": 25
+					},
+					{
+						"value": 0.1893330067396164,
+						"count": 25
+					},
+					{
+						"value": 0.24975000321865082,
+						"count": 15
+					},
+					{
+						"value": 0.28358298540115356,
+						"count": 5
+					},
+					{
+						"value": 0.34950000047683716,
+						"count": 4
+					},
+					0.4309999942779541
+				],
+				"count": 100
+			},
+			{
+				"metric": "request-time",
+				"path": "Probe",
+				"method": "GET",
+				"mean": 0.17071083000002546,
+				"distribution": [
+					0.03520800173282623,
+					{
+						"value": 0.07087499648332596,
+						"count": 9
+					},
+					{
+						"value": 0.09612499922513962,
+						"count": 15
+					},
+					{
+						"value": 0.16037499904632568,
+						"count": 25
+					},
+					{
+						"value": 0.22541700303554535,
+						"count": 25
+					},
+					{
+						"value": 0.272832989692688,
+						"count": 15
+					},
+					{
+						"value": 0.3149999976158142,
+						"count": 5
+					},
+					{
+						"value": 0.3767090141773224,
+						"count": 4
+					},
+					0.47533300518989563
+				],
+				"count": 100
+			},
+			{
+				"metric": "success",
+				"path": "Probe",
+				"method": "GET",
+				"total": 100,
+				"count": 100
+			},
+			{
+				"metric": "response_200",
+				"path": "Probe",
+				"method": "GET",
+				"total": 100,
+				"count": 100
+			},
+			{
+				"metric": "memory",
+				"threadId": 2,
+				"byThread": true,
+				"rss": 357154816,
+				"heapTotal": 54067200,
+				"heapUsed": 45568592,
+				"external": 22606048,
+				"arrayBuffers": 1268135
+			},
+			{
+				"metric": "event-loop-delay",
+				"threadId": 2,
+				"perThread": true,
+				"mean": 0.9062990769230765,
+				"maxDelay": 1.7251830000000012,
+				"count": 52
+			},
+			{
+				"metric": "write-transaction-queue-depth",
+				"threadId": 2,
+				"byThread": true,
+				"depth": 0,
+				"maxDepth": 0
+			},
+			{
+				"metric": "read-transaction-queue-depth",
+				"threadId": 2,
+				"byThread": true,
+				"depth": 0,
+				"maxDepth": 1
+			},
+			{
+				"metric": "utilization",
+				"idle": 1072.7332029999998,
+				"active": 41.9270889995787,
+				"utilization": 0.03761423036283646
+			}
+		],
+		"totalBytesProcessed": 0,
+		"id": 1791903749556.0496
+	},
+	{
+		"time": 1791903750669,
+		"period": 1001.4329580000012,
+		"threadId": 2,
+		"metrics": [
+			{
+				"metric": "db-read",
+				"path": "Probe",
+				"method": null,
+				"mean": 21,
+				"distribution": [
+					{
+						"value": 21,
+						"count": 100
+					}
+				],
+				"count": 100
+			},
+			{
+				"metric": "duration",
+				"path": "Probe",
+				"method": "GET",
+				"mean": 0.14008618999989267,
+				"distribution": [
+					0.03133299946784973,
+					{
+						"value": 0.04454199969768524,
+						"count": 9
+					},
+					{
+						"value": 0.06345800310373306,
+						"count": 15
+					},
+					{
+						"value": 0.1368750035762787,
+						"count": 25
+					},
+					{
+						"value": 0.1857910007238388,
+						"count": 25
+					},
+					{
+						"value": 0.24070799350738525,
+						"count": 15
+					},
+					{
+						"value": 0.30295801162719727,
+						"count": 5
+					},
+					{
+						"value": 0.34700000286102295,
+						"count": 4
+					},
+					0.35145801305770874
+				],
+				"count": 100
+			},
+			{
+				"metric": "request-time",
+				"path": "Probe",
+				"method": "GET",
+				"mean": 0.16169456000003266,
+				"distribution": [
+					0.03733300045132637,
+					{
+						"value": 0.05362499877810478,
+						"count": 9
+					},
+					{
+						"value": 0.07354100048542023,
+						"count": 15
+					},
+					{
+						"value": 0.15320800244808197,
+						"count": 25
+					},
+					{
+						"value": 0.2235410064458847,
+						"count": 25
+					},
+					{
+						"value": 0.2762080132961273,
+						"count": 15
+					},
+					{
+						"value": 0.3486660122871399,
+						"count": 5
+					},
+					{
+						"value": 0.3865419924259186,
+						"count": 4
+					},
+					0.4087499976158142
+				],
+				"count": 100
+			},
+			{
+				"metric": "success",
+				"path": "Probe",
+				"method": "GET",
+				"total": 100,
+				"count": 100
+			},
+			{
+				"metric": "response_200",
+				"path": "Probe",
+				"method": "GET",
+				"total": 100,
+				"count": 100
+			},
+			{
+				"metric": "memory",
+				"threadId": 2,
+				"byThread": true,
+				"rss": 357646336,
+				"heapTotal": 54591488,
+				"heapUsed": 46774512,
+				"external": 22606048,
+				"arrayBuffers": 1268135
+			},
+			{
+				"metric": "event-loop-delay",
+				"threadId": 2,
+				"perThread": true,
+				"mean": 0.7895957735849066,
+				"maxDelay": 1.0862070000000017,
+				"count": 53
+			},
+			{
+				"metric": "write-transaction-queue-depth",
+				"threadId": 2,
+				"byThread": true,
+				"depth": 0,
+				"maxDepth": 0
+			},
+			{
+				"metric": "read-transaction-queue-depth",
+				"threadId": 2,
+				"byThread": true,
+				"depth": 0,
+				"maxDepth": 1
+			},
+			{
+				"metric": "utilization",
+				"idle": 1074.0484969999998,
+				"active": 39.70404400561165,
+				"utilization": 0.03564889196101202
+			}
+		],
+		"totalBytesProcessed": 0,
+		"id": 1791903750669.811
+	},
+	{
+		"time": 1791903751784,
+		"period": 1000.2615829999995,
+		"threadId": 2,
+		"metrics": [
+			{
+				"metric": "db-read",
+				"path": "Probe",
+				"method": null,
+				"mean": 21,
+				"distribution": [
+					{
+						"value": 21,
+						"count": 100
+					}
+				],
+				"count": 100
+			},
+			{
+				"metric": "duration",
+				"path": "Probe",
+				"method": "GET",
+				"mean": 0.1395462599998791,
+				"distribution": [
+					0.023792000487446785,
+					{
+						"value": 0.04724999889731407,
+						"count": 9
+					},
+					{
+						"value": 0.07716699689626694,
+						"count": 15
+					},
+					{
+						"value": 0.13154199719429016,
+						"count": 25
+					},
+					{
+						"value": 0.1782499998807907,
+						"count": 25
+					},
+					{
+						"value": 0.242917001247406,
+						"count": 15
+					},
+					{
+						"value": 0.25920799374580383,
+						"count": 5
+					},
+					{
+						"value": 0.503832995891571,
+						"count": 4
+					},
+					0.5113750100135803
+				],
+				"count": 100
+			},
+			{
+				"metric": "request-time",
+				"path": "Probe",
+				"method": "GET",
+				"mean": 0.16245333000002574,
+				"distribution": [
+					0.02804199978709221,
+					{
+						"value": 0.05575000122189522,
+						"count": 9
+					},
+					{
+						"value": 0.08833400160074234,
+						"count": 15
+					},
+					{
+						"value": 0.1626249998807907,
+						"count": 25
+					},
+					{
+						"value": 0.2136249989271164,
+						"count": 25
+					},
+					{
+						"value": 0.2669160068035126,
+						"count": 15
+					},
+					{
+						"value": 0.30104100704193115,
+						"count": 5
+					},
+					{
+						"value": 0.5214999914169312,
+						"count": 4
+					},
+					0.5502499938011169
+				],
+				"count": 100
+			},
+			{
+				"metric": "success",
+				"path": "Probe",
+				"method": "GET",
+				"total": 100,
+				"count": 100
+			},
+			{
+				"metric": "response_200",
+				"path": "Probe",
+				"method": "GET",
+				"total": 100,
+				"count": 100
+			},
+			{
+				"metric": "memory",
+				"threadId": 2,
+				"byThread": true,
+				"rss": 358875136,
+				"heapTotal": 63504384,
+				"heapUsed": 41276552,
+				"external": 22601872,
+				"arrayBuffers": 1263959
+			},
+			{
+				"metric": "event-loop-delay",
+				"threadId": 2,
+				"perThread": true,
+				"mean": 0.7991788679245317,
+				"maxDelay": 1.118974999999999,
+				"count": 53
+			},
+			{
+				"metric": "write-transaction-queue-depth",
+				"threadId": 2,
+				"byThread": true,
+				"depth": 0,
+				"maxDepth": 0
+			},
+			{
+				"metric": "read-transaction-queue-depth",
+				"threadId": 2,
+				"byThread": true,
+				"depth": 0,
+				"maxDepth": 1
+			},
+			{
+				"metric": "utilization",
+				"idle": 1066.4582910000026,
+				"active": 48.696958997970796,
+				"utilization": 0.04366832241345704
+			}
+		],
+		"totalBytesProcessed": 0,
+		"id": 1791903751784.9731
+	},
+	{
+		"time": 1791903752896,
+		"period": 1000.9519579999978,
+		"threadId": 2,
+		"metrics": [
+			{
+				"metric": "db-read",
+				"path": "Probe",
+				"method": null,
+				"mean": 21,
+				"distribution": [
+					{
+						"value": 21,
+						"count": 100
+					}
+				],
+				"count": 100
+			},
+			{
+				"metric": "duration",
+				"path": "Probe",
+				"method": "GET",
+				"mean": 0.1477974899999026,
+				"distribution": [
+					0.02833300083875656,
+					{
+						"value": 0.06537500023841858,
+						"count": 9
+					},
+					{
+						"value": 0.09491600096225739,
+						"count": 15
+					},
+					{
+						"value": 0.14045800268650055,
+						"count": 25
+					},
+					{
+						"value": 0.18241700530052185,
+						"count": 25
+					},
+					{
+						"value": 0.22683300077915192,
+						"count": 15
+					},
+					{
+						"value": 0.2480829954147339,
+						"count": 5
+					},
+					{
+						"value": 0.3462499976158142,
+						"count": 4
+					},
+					0.47749999165534973
+				],
+				"count": 100
+			},
+			{
+				"metric": "request-time",
+				"path": "Probe",
+				"method": "GET",
+				"mean": 0.16811875000006693,
+				"distribution": [
+					0.03333299979567528,
+					{
+						"value": 0.07612500339746475,
+						"count": 9
+					},
+					{
+						"value": 0.10416600108146667,
+						"count": 15
+					},
+					{
+						"value": 0.1699579954147339,
+						"count": 25
+					},
+					{
+						"value": 0.2074580043554306,
+						"count": 25
+					},
+					{
+						"value": 0.2601659893989563,
+						"count": 15
+					},
+					{
+						"value": 0.2825410068035126,
+						"count": 5
+					},
+					{
+						"value": 0.36766698956489563,
+						"count": 4
+					},
+					0.5111669898033142
+				],
+				"count": 100
+			},
+			{
+				"metric": "success",
+				"path": "Probe",
+				"method": "GET",
+				"total": 100,
+				"count": 100
+			},
+			{
+				"metric": "response_200",
+				"path": "Probe",
+				"method": "GET",
+				"total": 100,
+				"count": 100
+			},
+			{
+				"metric": "memory",
+				"threadId": 2,
+				"byThread": true,
+				"rss": 360841216,
+				"heapTotal": 63504384,
+				"heapUsed": 44545152,
+				"external": 22604560,
+				"arrayBuffers": 1266647
+			},
+			{
+				"metric": "event-loop-delay",
+				"threadId": 2,
+				"perThread": true,
+				"mean": 0.8209132307692322,
+				"maxDelay": 1.3647349999999996,
+				"count": 52
+			},
+			{
+				"metric": "write-transaction-queue-depth",
+				"threadId": 2,
+				"byThread": true,
+				"depth": 0,
+				"maxDepth": 0
+			},
+			{
+				"metric": "read-transaction-queue-depth",
+				"threadId": 2,
+				"byThread": true,
+				"depth": 0,
+				"maxDepth": 1
+			},
+			{
+				"metric": "utilization",
+				"idle": 1070.0670019999998,
+				"active": 41.04783099732231,
+				"utilization": 0.03694292414996609
+			}
+		],
+		"totalBytesProcessed": 0,
+		"id": 1791903752896.0942
+	},
+	{
+		"time": 1791903754003,
+		"period": 1000.6819589999977,
+		"threadId": 2,
+		"metrics": [
+			{
+				"metric": "db-read",
+				"path": "Probe",
+				"method": null,
+				"mean": 21,
+				"distribution": [
+					{
+						"value": 21,
+						"count": 100
+					}
+				],
+				"count": 100
+			},
+			{
+				"metric": "duration",
+				"path": "Probe",
+				"method": "GET",
+				"mean": 0.1385683700001755,
+				"distribution": [
+					0.03508299961686134,
+					{
+						"value": 0.04691600054502487,
+						"count": 9
+					},
+					{
+						"value": 0.07050000131130219,
+						"count": 15
+					},
+					{
+						"value": 0.12712499499320984,
+						"count": 25
+					},
+					{
+						"value": 0.17550000548362732,
+						"count": 25
+					},
+					{
+						"value": 0.24012500047683716,
+						"count": 15
+					},
+					{
+						"value": 0.27104100584983826,
+						"count": 5
+					},
+					{
+						"value": 0.40941599011421204,
+						"count": 4
+					},
+					0.4251669943332672
+				],
+				"count": 100
+			},
+			{
+				"metric": "request-time",
+				"path": "Probe",
+				"method": "GET",
+				"mean": 0.15818424000026426,
+				"distribution": [
+					0.04154200106859207,
+					{
+						"value": 0.054333001375198364,
+						"count": 9
+					},
+					{
+						"value": 0.08604200184345245,
+						"count": 15
+					},
+					{
+						"value": 0.15070900321006775,
+						"count": 25
+					},
+					{
+						"value": 0.20149999856948853,
+						"count": 25
+					},
+					{
+						"value": 0.265749990940094,
+						"count": 15
+					},
+					{
+						"value": 0.2962090075016022,
+						"count": 5
+					},
+					{
+						"value": 0.4653339982032776,
+						"count": 4
+					},
+					0.47670799493789673
+				],
+				"count": 100
+			},
+			{
+				"metric": "success",
+				"path": "Probe",
+				"method": "GET",
+				"total": 100,
+				"count": 100
+			},
+			{
+				"metric": "response_200",
+				"path": "Probe",
+				"method": "GET",
+				"total": 100,
+				"count": 100
+			},
+			{
+				"metric": "memory",
+				"threadId": 2,
+				"byThread": true,
+				"rss": 362266624,
+				"heapTotal": 63504384,
+				"heapUsed": 42764304,
+				"external": 22603360,
+				"arrayBuffers": 1265447
+			},
+			{
+				"metric": "event-loop-delay",
+				"threadId": 2,
+				"perThread": true,
+				"mean": 0.8521058461538473,
+				"maxDelay": 1.4302710000000012,
+				"count": 52
+			},
+			{
+				"metric": "write-transaction-queue-depth",
+				"threadId": 2,
+				"byThread": true,
+				"depth": 0,
+				"maxDepth": 0
+			},
+			{
+				"metric": "read-transaction-queue-depth",
+				"threadId": 2,
+				"byThread": true,
+				"depth": 0,
+				"maxDepth": 1
+			},
+			{
+				"metric": "utilization",
+				"idle": 1065.909122000001,
+				"active": 41.30175299707844,
+				"utilization": 0.0373025174605401
+			}
+		],
+		"totalBytesProcessed": 0,
+		"id": 1791903754003.3389
+	},
+	{
+		"time": 1791903755113,
+		"period": 999.7894580000029,
+		"threadId": 2,
+		"metrics": [
+			{
+				"metric": "db-read",
+				"path": "Probe",
+				"method": null,
+				"mean": 21,
+				"distribution": [
+					{
+						"value": 21,
+						"count": 100
+					}
+				],
+				"count": 100
+			},
+			{
+				"metric": "duration",
+				"path": "Probe",
+				"method": "GET",
+				"mean": 0.14257292999991478,
+				"distribution": [
+					0.026916999369859695,
+					{
+						"value": 0.050958000123500824,
+						"count": 9
+					},
+					{
+						"value": 0.08641699701547623,
+						"count": 15
+					},
+					{
+						"value": 0.1463329941034317,
+						"count": 25
+					},
+					{
+						"value": 0.18387499451637268,
+						"count": 25
+					},
+					{
+						"value": 0.2308329939842224,
+						"count": 15
+					},
+					{
+						"value": 0.24804100394248962,
+						"count": 5
+					},
+					{
+						"value": 0.2718749940395355,
+						"count": 4
+					},
+					0.36387500166893005
+				],
+				"count": 100
+			},
+			{
+				"metric": "request-time",
+				"path": "Probe",
+				"method": "GET",
+				"mean": 0.16317169999994804,
+				"distribution": [
+					0.03150000050663948,
+					{
+						"value": 0.05962499976158142,
+						"count": 9
+					},
+					{
+						"value": 0.09816700220108032,
+						"count": 15
+					},
+					{
+						"value": 0.17008300125598907,
+						"count": 25
+					},
+					{
+						"value": 0.20554199814796448,
+						"count": 25
+					},
+					{
+						"value": 0.26225000619888306,
+						"count": 15
+					},
+					{
+						"value": 0.304749995470047,
+						"count": 5
+					},
+					{
+						"value": 0.33558401465415955,
+						"count": 4
+					},
+					0.39091700315475464
+				],
+				"count": 100
+			},
+			{
+				"metric": "success",
+				"path": "Probe",
+				"method": "GET",
+				"total": 100,
+				"count": 100
+			},
+			{
+				"metric": "response_200",
+				"path": "Probe",
+				"method": "GET",
+				"total": 100,
+				"count": 100
+			},
+			{
+				"metric": "memory",
+				"threadId": 2,
+				"byThread": true,
+				"rss": 365182976,
+				"heapTotal": 63504384,
+				"heapUsed": 42041848,
+				"external": 22606048,
+				"arrayBuffers": 1264679
+			},
+			{
+				"metric": "event-loop-delay",
+				"threadId": 2,
+				"perThread": true,
+				"mean": 0.7388981132075472,
+				"maxDelay": 1.3155830000000002,
+				"count": 53
+			},
+			{
+				"metric": "write-transaction-queue-depth",
+				"threadId": 2,
+				"byThread": true,
+				"depth": 0,
+				"maxDepth": 0
+			},
+			{
+				"metric": "read-transaction-queue-depth",
+				"threadId": 2,
+				"byThread": true,
+				"depth": 0,
+				"maxDepth": 1
+			},
+			{
+				"metric": "utilization",
+				"idle": 1067.4446290000014,
+				"active": 42.01224600387286,
+				"utilization": 0.037867398860118966
+			}
+		],
+		"totalBytesProcessed": 0,
+		"id": 1791903755112.78
+	},
+	{
+		"time": 1791903756229,
+		"period": 1000.471625000002,
+		"threadId": 2,
+		"metrics": [
+			{
+				"metric": "db-read",
+				"path": "Probe",
+				"method": null,
+				"mean": 21,
+				"distribution": [
+					{
+						"value": 21,
+						"count": 100
+					}
+				],
+				"count": 100
+			},
+			{
+				"metric": "duration",
+				"path": "Probe",
+				"method": "GET",
+				"mean": 0.15307997999985673,
+				"distribution": [
+					0.029834000393748283,
+					{
+						"value": 0.06370799988508224,
+						"count": 9
+					},
+					{
+						"value": 0.10416699945926666,
+						"count": 15
+					},
+					{
+						"value": 0.14862500131130219,
+						"count": 25
+					},
+					{
+						"value": 0.1944579929113388,
+						"count": 25
+					},
+					{
+						"value": 0.24545900523662567,
+						"count": 15
+					},
+					{
+						"value": 0.2784160077571869,
+						"count": 5
+					},
+					{
+						"value": 0.31116700172424316,
+						"count": 4
+					},
+					0.3461669981479645
+				],
+				"count": 100
+			},
+			{
+				"metric": "request-time",
+				"path": "Probe",
+				"method": "GET",
+				"mean": 0.17801704999983486,
+				"distribution": [
+					0.03533399850130081,
+					{
+						"value": 0.07520800083875656,
+						"count": 9
+					},
+					{
+						"value": 0.12241700291633606,
+						"count": 15
+					},
+					{
+						"value": 0.1735830008983612,
+						"count": 25
+					},
+					{
+						"value": 0.22591599822044373,
+						"count": 25
+					},
+					{
+						"value": 0.2773340046405792,
+						"count": 15
+					},
+					{
+						"value": 0.3259580135345459,
+						"count": 5
+					},
+					{
+						"value": 0.3503749966621399,
+						"count": 4
+					},
+					0.38029199838638306
+				],
+				"count": 100
+			},
+			{
+				"metric": "success",
+				"path": "Probe",
+				"method": "GET",
+				"total": 100,
+				"count": 100
+			},
+			{
+				"metric": "response_200",
+				"path": "Probe",
+				"method": "GET",
+				"total": 100,
+				"count": 100
+			},
+			{
+				"metric": "memory",
+				"threadId": 2,
+				"byThread": true,
+				"rss": 365199360,
+				"heapTotal": 63504384,
+				"heapUsed": 45246408,
+				"external": 22605280,
+				"arrayBuffers": 1267367
+			},
+			{
+				"metric": "event-loop-delay",
+				"threadId": 2,
+				"perThread": true,
+				"mean": 0.7115815384615409,
+				"maxDelay": 1.3155830000000002,
+				"count": 52
+			},
+			{
+				"metric": "write-transaction-queue-depth",
+				"threadId": 2,
+				"byThread": true,
+				"depth": 0,
+				"maxDepth": 0
+			},
+			{
+				"metric": "read-transaction-queue-depth",
+				"threadId": 2,
+				"byThread": true,
+				"depth": 0,
+				"maxDepth": 1
+			},
+			{
+				"metric": "utilization",
+				"idle": 1071.0832539999974,
+				"active": 45.631078997801524,
+				"utilization": 0.04086190859152469
+			}
+		],
+		"totalBytesProcessed": 0,
+		"id": 1791903756229.5059
+	},
+	{
+		"time": 1791903757350,
+		"period": 1000.4056659999987,
+		"threadId": 2,
+		"metrics": [
+			{
+				"metric": "db-read",
+				"path": "Probe",
+				"method": null,
+				"mean": 21,
+				"distribution": [
+					{
+						"value": 21,
+						"count": 100
+					}
+				],
+				"count": 100
+			},
+			{
+				"metric": "duration",
+				"path": "Probe",
+				"method": "GET",
+				"mean": 0.14915994000002683,
+				"distribution": [
+					0.026667000725865364,
+					{
+						"value": 0.05333299934864044,
+						"count": 9
+					},
+					{
+						"value": 0.0864579975605011,
+						"count": 15
+					},
+					{
+						"value": 0.13750000298023224,
+						"count": 25
+					},
+					{
+						"value": 0.1909170001745224,
+						"count": 25
+					},
+					{
+						"value": 0.25541698932647705,
+						"count": 15
+					},
+					{
+						"value": 0.3474999964237213,
+						"count": 5
+					},
+					{
+						"value": 0.4187920093536377,
+						"count": 4
+					},
+					0.4552080035209656
+				],
+				"count": 100
+			},
+			{
+				"metric": "request-time",
+				"path": "Probe",
+				"method": "GET",
+				"mean": 0.16958459000012227,
+				"distribution": [
+					0.03116700053215027,
+					{
+						"value": 0.06224999949336052,
+						"count": 9
+					},
+					{
+						"value": 0.10225000232458115,
+						"count": 15
+					},
+					{
+						"value": 0.16474999487400055,
+						"count": 25
+					},
+					{
+						"value": 0.2144159972667694,
+						"count": 25
+					},
+					{
+						"value": 0.2777090072631836,
+						"count": 15
+					},
+					{
+						"value": 0.37104201316833496,
+						"count": 5
+					},
+					{
+						"value": 0.45912501215934753,
+						"count": 4
+					},
+					0.4938330054283142
+				],
+				"count": 100
+			},
+			{
+				"metric": "success",
+				"path": "Probe",
+				"method": "GET",
+				"total": 100,
+				"count": 100
+			},
+			{
+				"metric": "response_200",
+				"path": "Probe",
+				"method": "GET",
+				"total": 100,
+				"count": 100
+			},
+			{
+				"metric": "memory",
+				"threadId": 2,
+				"byThread": true,
+				"rss": 365199360,
+				"heapTotal": 63504384,
+				"heapUsed": 44271080,
+				"external": 22608016,
+				"arrayBuffers": 1264679
+			},
+			{
+				"metric": "event-loop-delay",
+				"threadId": 2,
+				"perThread": true,
+				"mean": 0.8365838490566055,
+				"maxDelay": 1.3647349999999996,
+				"count": 53
+			},
+			{
+				"metric": "write-transaction-queue-depth",
+				"threadId": 2,
+				"byThread": true,
+				"depth": 0,
+				"maxDepth": 0
+			},
+			{
+				"metric": "read-transaction-queue-depth",
+				"threadId": 2,
+				"byThread": true,
+				"depth": 0,
+				"maxDepth": 1
+			},
+			{
+				"metric": "utilization",
+				"idle": 1076.8065910000005,
+				"active": 44.34465900476789,
+				"utilization": 0.03955278915719827
+			}
+		],
+		"totalBytesProcessed": 0,
+		"id": 1791903757350.6711
+	}
+]
