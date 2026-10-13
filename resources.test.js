@@ -183,16 +183,25 @@ describe('current_load_for_gtm', () => {
 		};
 		warnings.length = 0;
 		const { current_load_for_gtm: tooLong } = await import('./resources.js?window=600');
-		server.config = {};
 		assert.equal(warnings.length, 1);
 		assert.match(warnings[0], /600s clamped to 120s/);
+
+		// Core keeps at least one aggregation period, so a retention below the period does not shrink
+		// the floor past the period, and a period under 30 s does.
+		server.config = {
+			analytics: { aggregatePeriod: 10, rawRetentionMs: 5_000 },
+			akamaiStatus: { loadThresholds: { windowSeconds: 60 } },
+		};
+		warnings.length = 0;
+		await import('./resources.js?window=short-period');
+		server.config = {};
+		assert.match(warnings[0], /60s clamped to 10s/);
 
 		const requests = [];
 		searchHandler = (received) => {
 			requests.push(received);
 			return asyncIterable(windowReports());
 		};
-		// 48,000 ms over 30 s on two workers is 0.8; over 120 s it is 0.2.
 		assert.equal((await new tooShort().get()).data, 'load:800');
 		assert.equal(requests.at(-1).conditions[0].value, now - 30_000);
 		assert.equal((await new tooLong().get()).data, 'load:200');
@@ -247,12 +256,10 @@ describe('current_load_for_gtm', () => {
 		assert.equal(await loadBody(), 'load:100000');
 		assert.match(warnings.at(-1), /no count/);
 
-		// Recover, so the next failure starts its own warned episode.
 		now += 60_000;
 		searchHandler = serving(windowReports());
 		await loadBody();
 
-		// null is not a mean either, and Number(null) is 0, so it must not slip through as idle.
 		now += 60_000;
 		searchHandler = serving([report(now - 1_000, 1, [{ ...duration('/resource', 9_000, 2), mean: null }])]);
 		assert.equal(await loadBody(), 'load:100000');
@@ -369,7 +376,6 @@ describe('current_load_for_gtm', () => {
 		};
 
 		await loadBody();
-		// Inside the derived TTL, half the 60 s window.
 		now += 20_000;
 		await loadBody();
 		assert.equal(queries, 1);

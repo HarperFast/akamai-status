@@ -18,17 +18,19 @@ if (!configuredWorkers) {
 	);
 }
 
-// Handler work is averaged over the last window: one aggregation period by default, the span the
-// aggregate rows describe, so the number means the same thing in both. A window shorter than GTM's
-// 30 s poll interval can hold no report on an idle node and flap to max; one longer than core's raw
-// retention divides by time it cannot see.
-const MIN_WINDOW_MS = 30_000;
-const rawRetentionMs = positiveNumber(server.config?.analytics?.rawRetentionMs, 3_600_000);
+// A window shorter than GTM's 30 s poll interval can hold no report on an idle node and flap to
+// max; one longer than what core retains divides by time it cannot see. Core keeps raw reports for
+// at least one aggregation period.
+const GTM_POLL_MS = 30_000;
+const retainedMs = Math.max(
+	positiveNumber(server.config?.analytics?.rawRetentionMs, 3_600_000),
+	aggregatePeriodSeconds * 1000
+);
 const requestedWindowMs = positiveNumber(cfg.loadThresholds?.windowSeconds, aggregatePeriodSeconds) * 1000;
-const windowMs = Math.min(Math.max(requestedWindowMs, MIN_WINDOW_MS), Math.max(rawRetentionMs, MIN_WINDOW_MS));
+const windowMs = Math.min(Math.max(requestedWindowMs, Math.min(GTM_POLL_MS, retainedMs)), retainedMs);
 if (windowMs !== requestedWindowMs) {
 	logger.warn(
-		`akamai-status: load window of ${requestedWindowMs / 1000}s clamped to ${windowMs / 1000}s (between 30s and analytics.rawRetentionMs)`
+		`akamai-status: load window of ${requestedWindowMs / 1000}s clamped to ${windowMs / 1000}s (between 30s and what analytics.rawRetentionMs keeps)`
 	);
 }
 
