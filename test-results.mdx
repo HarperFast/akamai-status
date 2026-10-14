@@ -204,7 +204,7 @@ Only the stressed node reports elevated load. **PASS**
 | Resource Name | load |
 | Resource Type | Non-XML load object via HTTP |
 | Load Leader String | `load:` |
-| Upper Bound | 1000 |
+| Upper Bound | 1000 (Oct 1 setup; read as 0, no limit, on the `lfct1.devin-enterprise-load` resource in Control Center on 2026-10-14) |
 | Load Object | `/current_load_for_gtm` (port 443, per datacenter) |
 | Liveness Test | HTTPS GET `/status`, response string: "reporting for duty" |
 
