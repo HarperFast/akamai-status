@@ -5,6 +5,7 @@
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert';
 import { readFileSync } from 'node:fs';
+import { Worker } from 'node:worker_threads';
 
 const warnings = [];
 let operationHandler;
@@ -83,6 +84,34 @@ function busyMsOf(reports) {
 async function loadBody() {
 	const response = await new current_load_for_gtm().get();
 	return response.data;
+}
+
+// This suite runs on the main thread, where a single-threaded node runs the component. A node with
+// worker threads runs it on a worker, so that case loads its own module instance on one.
+function loadOnWorker(reports) {
+	return new Promise((resolve, reject) => {
+		const worker = new Worker(
+			`
+			const { parentPort, workerData } = require('node:worker_threads');
+			globalThis.logger = { warn() {}, info() {}, error() {}, notify() {}, trace() {}, debug() {} };
+			globalThis.Resource = class {};
+			globalThis.server = { workerCount: 2, config: {} };
+			globalThis.databases = {
+				system: { hdb_raw_analytics: { search: async function* () { yield* workerData.reports; } } },
+			};
+			import(workerData.module).then(
+				async ({ current_load_for_gtm }) => parentPort.postMessage((await new current_load_for_gtm().get()).data),
+				(error) => parentPort.postMessage('import failed: ' + error.message)
+			);
+			`,
+			{ eval: true, workerData: { reports, module: new URL('./resources.js', import.meta.url).href } }
+		);
+		worker.once('message', (body) => {
+			worker.terminate();
+			resolve(body);
+		});
+		worker.once('error', reject);
+	});
 }
 
 // Degraded state is module-level and deliberately persists across polls, so a test that asserts
@@ -298,6 +327,28 @@ describe('current_load_for_gtm', () => {
 		const expected = Math.round((busyMsOf(captured) / 60_000 / 2) * 1000);
 		assert.equal(expected, 2);
 		assert.equal(await loadBody(), `load:${expected}`);
+	});
+
+	it("skips the main thread's reports, where the operations API runs, when the component runs on a worker", async () => {
+		// us-east1-b-1's idle window plus a main-thread report of the shape core writes for
+		// operations-API calls: a 7.2 s operation, and untyped entries like rejected logins.
+		const idle = capturedReports('raw-idle-lfct1');
+		const operations = report(now - 1_000, 0, [
+			{ metric: 'duration', path: 'get_analytics', type: 'operation', count: 1, mean: 7_200 },
+			duration('/', 3, 1, 'POST'),
+		]);
+
+		assert.equal(await loadOnWorker([...idle, operations]), 'load:0');
+		// The same work in a worker's report counts.
+		const expected = Math.round(((busyMsOf(idle) + 7_203) / 60_000 / 2) * 1000);
+		assert.equal(expected, 60);
+		assert.equal(await loadOnWorker([...idle, { ...operations, threadId: 1 }]), `load:${expected}`);
+	});
+
+	it("counts the main thread's reports on a single-threaded node, where that thread serves HTTP", async () => {
+		searchHandler = serving([report(now - 1_000, 0, [duration('/resource', 6_000, 10)])]);
+
+		assert.equal(await loadBody(), 'load:500');
 	});
 
 	it('reports max load when no report was written in the window', async () => {

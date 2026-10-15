@@ -1,3 +1,5 @@
+import { isMainThread } from 'node:worker_threads';
+
 const DEFAULT_200_MSG = 'Status endpoint is reporting for duty.';
 const DEFAULT_404_MSG = 'Status endpoint is reporting downtime.';
 
@@ -80,6 +82,10 @@ async function getBusyFraction() {
 	let sawReport = false;
 	let busyMs = 0;
 	for await (const report of reports) {
+		// Thread 0 is the main thread, which serves the operations API: work GTM cannot shed by
+		// steering traffic. On a single-threaded node this code runs there, and its reports are the
+		// HTTP work.
+		if (report.threadId === 0 && !isMainThread) continue;
 		sawReport = true;
 		for (const entry of report.metrics ?? []) {
 			if (entry.metric !== 'duration') continue;
