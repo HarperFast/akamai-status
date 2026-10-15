@@ -44,7 +44,6 @@ const CONFIG = {
 	max: positiveNumber(cfg.loadThresholds?.max, 100000),
 	prefix: 'load:',
 	window: windowMs,
-	// Half the window matches GTM's 30 s poll interval; every worker scans the window on a miss.
 	cacheTtl: Math.max(windowMs / 2, 2000),
 };
 
@@ -73,8 +72,6 @@ function clearDegraded() {
 	}
 }
 
-// The raw table is written per node and never replicated, so the scan is bounded by this node's
-// workers, not the cluster.
 async function getBusyFraction() {
 	const reports = await databases.system.hdb_raw_analytics.search({
 		conditions: [{ attribute: 'id', comparator: 'greater_than_equal', value: Date.now() - CONFIG.window }],
@@ -83,14 +80,12 @@ async function getBusyFraction() {
 	let busyMs = 0;
 	for await (const report of reports) {
 		// Thread 0 is the main thread, which serves the operations API: work GTM cannot shed by
-		// steering traffic. On a single-threaded node this code runs there, and its reports are the
-		// HTTP work.
+		// steering traffic. A single-threaded node runs this code there and serves HTTP there too, so
+		// only its operation entries are left out.
 		if (report.threadId === 0 && !isMainThread) continue;
 		sawReport = true;
 		for (const entry of report.metrics ?? []) {
-			if (entry.metric !== 'duration') continue;
-			// An entry without a numeric count, or with responses but no mean, is a changed contract:
-			// fail closed rather than report idle.
+			if (entry.metric !== 'duration' || entry.type === 'operation') continue;
 			const { count, mean } = entry;
 			if (typeof count !== 'number' || !Number.isFinite(count))
 				throw new Error(`duration entry for ${entry.path} has no count`);

@@ -40,7 +40,6 @@ function duration(path, count, mean, method = 'GET') {
 	return { metric: 'duration', path, method, count, mean };
 }
 
-// One worker's report for the second ending at `id`, the shape core writes to hdb_raw_analytics.
 function report(id, threadId, metrics) {
 	return { id, time: Math.floor(id), period: 1000.2, threadId, metrics };
 }
@@ -68,7 +67,7 @@ function serving(reports) {
 	return () => asyncIterable(reports);
 }
 
-// Verbatim hdb_raw_analytics rows: the suite proves core's report contract, not a model of it.
+// Unedited hdb_raw_analytics rows captured from real nodes.
 function capturedReports(name) {
 	return JSON.parse(readFileSync(new URL(`./fixtures/${name}.json`, import.meta.url), 'utf8'));
 }
@@ -86,8 +85,6 @@ async function loadBody() {
 	return response.data;
 }
 
-// This suite runs on the main thread, where a single-threaded node runs the component. A node with
-// worker threads runs it on a worker, so that case loads its own module instance on one.
 function loadOnWorker(reports) {
 	return new Promise((resolve, reject) => {
 		const worker = new Worker(
@@ -185,7 +182,6 @@ describe('current_load_for_gtm', () => {
 	});
 
 	it('uses a configured window for both the query and the denominator', async () => {
-		// CONFIG is built at import time, so load a second module instance under the config.
 		server.config = { akamaiStatus: { loadThresholds: { windowSeconds: 30 } } };
 		const { current_load_for_gtm: shortWindow } = await import('./resources.js?window=30');
 		server.config = {};
@@ -244,7 +240,6 @@ describe('current_load_for_gtm', () => {
 	});
 
 	it('divides by threads.count when server.workerCount is absent, and by one when neither is set', async () => {
-		// WORKER_COUNT is read at import, so each case loads its own module instance.
 		const savedCount = server.workerCount;
 		delete server.workerCount;
 		server.config = { threads: { count: 4 } };
@@ -284,8 +279,6 @@ describe('current_load_for_gtm', () => {
 	});
 
 	it('reports max load, not idle, when a duration entry lacks a numeric count or mean', async () => {
-		// A changed report contract must fail closed: load:0 would attract traffic to a node whose
-		// load is unknown.
 		const { count, ...noCount } = duration('/resource', 9_000, 2);
 		searchHandler = serving([report(now - 1_000, 1, [noCount])]);
 		assert.equal(await loadBody(), 'load:100000');
@@ -300,7 +293,6 @@ describe('current_load_for_gtm', () => {
 		assert.equal(await loadBody(), 'load:100000');
 		assert.match(warnings.at(-1), /no mean/);
 
-		// A zero-response entry carries no mean and is not a contract change.
 		now += 60_000;
 		searchHandler = serving([
 			report(now - 1_000, 1, [{ metric: 'duration', path: '/resource', method: 'GET', count: 0 }]),
@@ -330,23 +322,31 @@ describe('current_load_for_gtm', () => {
 	});
 
 	it("skips the main thread's reports, where the operations API runs, when the component runs on a worker", async () => {
-		// us-east1-b-1's idle window plus a main-thread report of the shape core writes for
-		// operations-API calls: a 7.2 s operation, and untyped entries like rejected logins.
+		// The operations port also serves Fastify routes, and core records a rejected login there with
+		// no type, so a type filter alone would not keep that thread's work out.
 		const idle = capturedReports('raw-idle-lfct1');
-		const operations = report(now - 1_000, 0, [
-			{ metric: 'duration', path: 'get_analytics', type: 'operation', count: 1, mean: 7_200 },
+		const portRoutes = [
+			{ metric: 'duration', path: '/api/openapi/rest', type: 'fastify-route', count: 1, mean: 3_000 },
 			duration('/', 3, 1, 'POST'),
+		];
+		const mainThread = report(now - 1_000, 0, [
+			{ metric: 'duration', path: 'get_analytics', type: 'operation', count: 1, mean: 7_200 },
+			...portRoutes,
 		]);
 
-		assert.equal(await loadOnWorker([...idle, operations]), 'load:0');
-		// The same work in a worker's report counts.
-		const expected = Math.round(((busyMsOf(idle) + 7_203) / 60_000 / 2) * 1000);
-		assert.equal(expected, 60);
-		assert.equal(await loadOnWorker([...idle, { ...operations, threadId: 1 }]), `load:${expected}`);
+		assert.equal(await loadOnWorker([...idle, mainThread]), 'load:0');
+		const expected = Math.round(((busyMsOf(idle) + 3_003) / 60_000 / 2) * 1000);
+		assert.equal(expected, 25);
+		assert.equal(await loadOnWorker([...idle, report(now - 1_000, 1, portRoutes)]), `load:${expected}`);
 	});
 
-	it("counts the main thread's reports on a single-threaded node, where that thread serves HTTP", async () => {
-		searchHandler = serving([report(now - 1_000, 0, [duration('/resource', 6_000, 10)])]);
+	it("counts the main thread's HTTP work on a single-threaded node, but not its operations", async () => {
+		searchHandler = serving([
+			report(now - 1_000, 0, [
+				duration('/resource', 6_000, 10),
+				{ metric: 'duration', path: 'sql', type: 'operation', count: 1, mean: 12_000 },
+			]),
+		]);
 
 		assert.equal(await loadBody(), 'load:500');
 	});

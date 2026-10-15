@@ -71,10 +71,9 @@ The figure is built from the `duration` metric core already records for every HT
 produces: the response count and mean handler time per path and method, error responses from handlers
 included. Core does not time a request that no handler serves, such as the 404 for an unknown path, one
 shed by the request-queue limit with a 503, or one whose error escapes to the server's own error handler.
-Each HTTP worker
-flushes those as a raw analytics report about once a second while it serves requests, into
-`system.hdb_raw_analytics`, a table core keeps per node and never replicates. Summing count times mean
-over this node's reports from the last window gives the milliseconds of handler time in that window;
+Each HTTP worker flushes those as a raw analytics report about once a second while it serves requests,
+into `system.hdb_raw_analytics`, a table core keeps per node and never replicates. Summing count times
+mean over this node's reports from the last window gives the milliseconds of handler time in that window;
 dividing by the window and by the worker count gives the work in flight per worker. The window is one
 analytics aggregation period by default (`analytics.aggregatePeriod`, 60s), the same span the aggregate
 rows describe, so the number means the same thing as it would from them; reading the raw reports instead
@@ -85,14 +84,14 @@ This is the kind of feedback resource Akamai's documentation asks for: GTM treat
 compares one property's datacenters against each other, and expects the value to rise with the traffic it
 steers and with nothing else. Only HTTP requests to the application move this number; replication,
 compaction, MQTT and cache revalidation never enter it, and neither do operations-API calls: Harper serves
-those on its main thread, and the component skips that thread's reports, except on a node that runs a
-single thread, where the main thread is also the HTTP worker. Because a slow request counts for more than a
+those on its main thread, whose reports the component skips; on a single-threaded node, where the main
+thread also serves HTTP, it skips their entries instead. Because a slow request counts for more than a
 fast one, a datacenter serving cache misses or slow handlers reports more load than one serving the same
-request count from cache,
-and as a node approaches saturation its handler times stretch and the figure rises ahead of failure. The
-per-worker normalization makes nodes of different sizes comparable with equal GTM weights. CPU, memory and
-event-loop utilization are deliberately not used; Akamai advises against them because background work
-moves them, and on Fabric the event-loop figure is distorted by harper-pro's profiler.
+request count from cache, and as a node approaches saturation its handler times stretch and the figure
+rises ahead of failure. The per-worker normalization makes nodes of different sizes comparable with equal
+GTM weights. CPU, memory and event-loop utilization are deliberately not used; Akamai advises against them
+because background work moves them, and on Fabric the event-loop figure is distorted by harper-pro's
+profiler.
 
 What the clock does not cover: TLS handshakes, request parsing and any wait before the handler runs, the
 transfer of the response body to the client, which for a streamed query result includes reading its
@@ -111,6 +110,8 @@ load polls are requests, so a window with no reports at all means analytics are 
 endpoint reports `max`, which takes the node out of GTM rotation. The same happens when the raw analytics
 query fails. Entering and leaving this state is logged at `warn`, once per episode rather than once per
 poll. A node that is up but idle still has reports, from the polls themselves, and reads `load:0`.
+Current core versions write no analytics from the main thread, so a single-threaded node, which serves
+HTTP there, has no reports and reads `max` until core records them.
 
 Load is not a health signal. A node whose application is gone answers with 404s that core does not time,
 and handlers that fail fast take little time, so such a node reads as idle, and GTM steers traffic to it
