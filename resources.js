@@ -1,5 +1,3 @@
-import { isMainThread } from 'node:worker_threads';
-
 const DEFAULT_200_MSG = 'Status endpoint is reporting for duty.';
 const DEFAULT_404_MSG = 'Status endpoint is reporting downtime.';
 
@@ -37,11 +35,12 @@ if (windowMs !== requestedWindowMs) {
 	);
 }
 
+const scale = positiveNumber(cfg.loadThresholds?.scale, 1000);
 const CONFIG = {
-	scale: positiveNumber(cfg.loadThresholds?.scale, 1000),
+	scale,
 	// Reported when load cannot be measured, so GTM shifts traffic away. The GTM resource's upper
 	// bound must be 0 or at least this value.
-	max: positiveNumber(cfg.loadThresholds?.max, 100000),
+	max: positiveNumber(cfg.loadThresholds?.max, scale),
 	prefix: 'load:',
 	window: windowMs,
 	cacheTtl: Math.max(windowMs / 2, 2000),
@@ -72,32 +71,57 @@ function clearDegraded() {
 	}
 }
 
+// harper-pro samples with its profiler in short windows and flags each report that overlapped one,
+// because sampling inflates that report's utilization.
+const PROFILER_SAMPLING = 'profiler-sampling';
+const NO_REPORTS = Symbol('no reports');
+const MOSTLY_SAMPLED = Symbol('mostly sampled');
+const JUST_STARTED = Symbol('just started');
+
+// Reports written before this worker loaded the component belong to a previous run of the node.
+const loadedAt = Date.now();
+
+function isNonNegativeNumber(value) {
+	return typeof value === 'number' && Number.isFinite(value) && value >= 0;
+}
+
 async function getBusyFraction() {
+	const now = Date.now();
+	const windowStart = now - CONFIG.window;
+	const countedFrom = Math.max(windowStart, loadedAt);
 	const reports = await databases.system.hdb_raw_analytics.search({
-		conditions: [{ attribute: 'id', comparator: 'greater_than_equal', value: Date.now() - CONFIG.window }],
+		conditions: [{ attribute: 'id', comparator: 'greater_than_equal', value: windowStart }],
 	});
 	let sawReport = false;
+	let sawUtilization = false;
 	let busyMs = 0;
+	let sampledMs = 0;
 	for await (const report of reports) {
-		// Thread 0 is the main thread, which serves the operations API: work GTM cannot shed by
-		// steering traffic. A single-threaded node runs this code there and serves HTTP there too, so
-		// only its operation entries are left out.
-		if (report.threadId === 0 && !isMainThread) continue;
 		sawReport = true;
-		for (const entry of report.metrics ?? []) {
-			if (entry.metric !== 'duration' || entry.type === 'operation') continue;
-			const { count, mean } = entry;
-			if (typeof count !== 'number' || !Number.isFinite(count))
-				throw new Error(`duration entry for ${entry.path} has no count`);
-			if (count > 0 && (typeof mean !== 'number' || !Number.isFinite(mean)))
-				throw new Error(`duration entry for ${entry.path} has no mean`);
-			busyMs += count * (mean || 0);
-		}
+		const metrics = report.metrics ?? [];
+		// Core attaches utilization to HTTP worker reports only.
+		const utilization = metrics.find((entry) => entry.metric === 'utilization');
+		if (!utilization) continue;
+		const { active, idle } = utilization;
+		if (!isNonNegativeNumber(active) || !isNonNegativeNumber(idle))
+			throw new Error(`utilization entry in report ${report.id} has no active or idle time`);
+		sawUtilization = true;
+		// The sample covers the worker's time since its previous report, which can start before the
+		// window; only the part inside it counts.
+		const spanMs = active + idle;
+		const insideMs = Math.min(spanMs, report.id - countedFrom);
+		if (!(insideMs > 0)) continue;
+		if (metrics.some((entry) => entry.metric === PROFILER_SAMPLING)) sampledMs += insideMs;
+		else busyMs += (active * insideMs) / spanMs;
 	}
 	// Core writes a report only for a worker that recorded something, and GTM's own polls are
 	// requests, so a window without reports means analytics are not being written.
-	if (!sawReport) return null;
-	return busyMs / CONFIG.window / WORKER_COUNT;
+	if (!sawReport) return now - loadedAt < CONFIG.window ? JUST_STARTED : NO_REPORTS;
+	if (!sawUtilization) throw new Error('no report in the window carries event-loop utilization');
+	// A worker without a report in the window recorded nothing and counts as idle.
+	const measuredMs = (now - countedFrom) * WORKER_COUNT - sampledMs;
+	if (measuredMs < CONFIG.window) return sampledMs > 0 ? MOSTLY_SAMPLED : JUST_STARTED;
+	return busyMs / measuredMs;
 }
 
 async function computeLoad() {
@@ -108,10 +132,19 @@ async function computeLoad() {
 		return reportMaxLoad('analytics-query-failed', `busy time unavailable: ${error?.message ?? error}`);
 	}
 
-	if (busy === null) {
+	if (busy === NO_REPORTS) {
 		return reportMaxLoad(
 			'analytics-missing',
 			`no analytics reports in the last ${CONFIG.window / 1000}s; check that analytics are enabled and being written`
+		);
+	}
+	// One episode either way: right after a start the profiler is usually sampling too.
+	if (busy === MOSTLY_SAMPLED || busy === JUST_STARTED) {
+		return reportMaxLoad(
+			'too-little-measured',
+			busy === MOSTLY_SAMPLED
+				? `harper-pro's profiler sampled most of the last ${CONFIG.window / 1000}s, which inflates event-loop utilization`
+				: `less than one worker's ${CONFIG.window / 1000}s window measured since this component started`
 		);
 	}
 
@@ -169,7 +202,7 @@ export class status extends Resource {
 
 /**
  * GET /current_load_for_gtm
- * Returns server load for Akamai in format "load:N", from in-flight handler work.
+ * Returns server load for Akamai in format "load:N", from the HTTP workers' event-loop utilization.
  */
 export class current_load_for_gtm extends Resource {
 	allowRead() {

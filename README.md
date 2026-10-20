@@ -52,7 +52,7 @@ harper set_status id=availability status=Unavailable
 
 ### GET /current_load_for_gtm
 
-Returns server load for Akamai GTM: how much request handling this node has in flight, per worker thread.
+Returns server load for Akamai GTM: how busy this node's HTTP worker threads are.
 
 ```shell
 curl http://localhost:9926/current_load_for_gtm
@@ -60,46 +60,40 @@ curl http://localhost:9926/current_load_for_gtm
 ```
 
 The body is `load:N`, served as `text/plain` and unquoted, so GTM's `load:` leader-string parse works on
-the raw bytes. `N` is the average number of requests inside a handler at once, per worker, over the last
-window, times `scale`. With the default `scale` of 1000, `load:1000` means one request continuously in
-flight on every worker, whether that request is computing or waiting on storage or an origin; `load:39`
-is the two-worker stage node serving 8,800 requests a minute at half a millisecond each; an idle node
-reports `load:0`. A node past saturation reports more than `scale`: that is a real reading, not an error,
-and only `max` clamps it.
+the raw bytes. `N` is the share of the last window that this node's HTTP workers spent running on their
+event loops, averaged over the workers, times `scale`. With the default `scale` of 1000, `load:1000` means
+every worker was busy for the whole window. That is the ceiling: a worker cannot be more than fully busy.
+An idle node reads close to `load:0`.
 
-The figure is built from the `duration` metric core already records for every HTTP response a handler
-produces: the response count and mean handler time per path and method, error responses from handlers
-included. Core does not time a request that no handler serves, such as the 404 for an unknown path, one
-shed by the request-queue limit with a 503, or one whose error escapes to the server's own error handler.
-Each HTTP worker flushes those as a raw analytics report about once a second while it serves requests,
-into `system.hdb_raw_analytics`, a table core keeps per node and never replicates. Summing count times
-mean over this node's reports from the last window gives the milliseconds of handler time in that window;
-dividing by the window and by the worker count gives the work in flight per worker. The window is one
-analytics aggregation period by default (`analytics.aggregatePeriod`, 60s), the same span the aggregate
-rows describe, so the number means the same thing as it would from them; reading the raw reports instead
-keeps the scan bounded by this node's workers rather than by the cluster, and moves the value every
-second rather than once per aggregation cycle.
+The figure is built from the event-loop utilization core attaches to every HTTP worker's raw analytics
+report: the milliseconds the worker's event loop was active and idle since its previous report. Each worker
+flushes a report about once a second while it serves requests, into `system.hdb_raw_analytics`, a table
+core keeps per node and never replicates. The component sums the active time that falls inside the last
+window across every worker's reports, and divides by the window times the worker count; a worker that
+wrote no report in the window recorded no activity and counts as idle. The window is one analytics
+aggregation period by default (`analytics.aggregatePeriod`, 60s). Reading the raw reports keeps the scan
+bounded by this node's workers rather than by the cluster, and moves the value every second rather than
+once per aggregation cycle.
 
-This is the kind of feedback resource Akamai's documentation asks for: GTM treats loads as unit-less,
-compares one property's datacenters against each other, and expects the value to rise with the traffic it
-steers and with nothing else. Only HTTP requests to the application move this number; replication,
-compaction, MQTT and cache revalidation never enter it, and neither do operations-API calls: Harper serves
-those on its main thread, whose reports the component skips; on a single-threaded node, where the main
-thread also serves HTTP, it skips their entries instead. Because a slow request counts for more than a
-fast one, a datacenter serving cache misses or slow handlers reports more load than one serving the same
-request count from cache, and as a node approaches saturation its handler times stretch and the figure
-rises ahead of failure. The per-worker normalization makes nodes of different sizes comparable with equal
-GTM weights. CPU, memory and event-loop utilization are deliberately not used; Akamai advises against them
-because background work moves them, and on Fabric the event-loop figure is distorted by harper-pro's
-profiler.
+Utilization counts everything a worker's event loop runs, not only the requests GTM steers, so background
+work on the workers raises it too and makes GTM shift traffic away. Akamai's load feedback guidance asks for
+a value that changes only with the traffic GTM sends; this component departs from that on purpose, for a
+measure with an objective ceiling. Utilization does not see time a request spends waiting on storage or an
+origin, because the event loop is idle while it waits, nor work on other threads: the main thread, which
+serves the operations API, and native threads. A single saturated worker among idle ones shows only as its
+share of the average.
 
-What the clock does not cover: TLS handshakes, request parsing and any wait before the handler runs, the
-transfer of the response body to the client, which for a streamed query result includes reading its
-records, and work on threads other than the HTTP workers. Handshake and transfer times are paced by the
-client's distance, so counting them would make load depend on where GTM's clients are rather than on what
-the node does. A request is counted when its response is ready, in the report that covers that second, so
-a request longer than the window is invisible until it completes. A single saturated worker among idle
-ones shows only as its share of the per-worker average.
+harper-pro's profiler inflates utilization while it samples, to about 0.7 on an idle worker. From
+harper-pro 5.4 ([HarperFast/harper-pro#1012](https://github.com/HarperFast/harper-pro/pull/1012)) it
+samples only in short windows and flags each report that overlapped one with a `profiler-sampling` entry;
+the component leaves flagged reports out of both the busy time and the time it divides by. On an older
+harper-pro, set `analytics.profiling: false`, or an idle node reads about 700.
+
+The component counts only reports written since it loaded, so a restarted node does not read its previous
+run. Until it has measured at least one worker's window, the endpoint reports `max`: about 30 s after a
+start on a two-worker node, and about two and a half minutes on harper-pro, whose profiler samples for the
+first two aggregation periods. Sampling leaves too little measured again for a moment once every thousand
+periods.
 
 GTM balances datacenters, not nodes. The GTM resource aggregates its datacenter's load servers (median on
 Fabric), so with several nodes in one datacenter GTM sees one number for all of them and cannot shed from
@@ -108,14 +102,13 @@ one node alone. Nodes in one datacenter should be the same size.
 Core writes a report only for a worker that recorded something in that second, and GTM's own liveness and
 load polls are requests, so a window with no reports at all means analytics are not being written: the
 endpoint reports `max`, which takes the node out of GTM rotation. The same happens when the raw analytics
-query fails. Entering and leaving this state is logged at `warn`, once per episode rather than once per
-poll. A node that is up but idle still has reports, from the polls themselves, and reads `load:0`.
-Current core versions write no analytics from the main thread, so a single-threaded node, which serves
-HTTP there, has no reports and reads `max` until core records them.
+query fails, or when no report in the window carries utilization: core attaches it only to HTTP worker
+reports, so a single-threaded node, which serves HTTP on its main thread, has none. Entering and leaving
+this state is logged at `warn`, once per episode rather than once per poll.
 
-Load is not a health signal. A node whose application is gone answers with 404s that core does not time,
-and handlers that fail fast take little time, so such a node reads as idle, and GTM steers traffic to it
-while `/status` still passes. Take a broken node out of rotation with `DELETE /status`.
+Load is not a health signal. A node whose application is gone answers with cheap 404s, and handlers that
+fail fast take little time, so such a node reads as nearly idle, and GTM steers traffic to it while
+`/status` still passes. Take a broken node out of rotation with `DELETE /status`.
 
 Each worker caches its value for half the window (30s by default), GTM's poll interval. A refresh decodes
 every report in the window; measured on a two-worker laptop at 200 active endpoints and 5,700 requests per
@@ -136,8 +129,8 @@ Optional configuration in `harperdb-config.yaml`:
 ```yaml
 akamaiStatus:
   loadThresholds:
-    scale: 1000 # Load reported when every worker is continuously busy with requests (default: 1000)
-    max: 100000 # Reported when load cannot be measured, and the clamp on any reading (default: 100000)
+    scale: 1000 # Load reported when every worker's event loop is busy the whole window (default: 1000)
+    max: 1000 # Reported when load cannot be measured, and the clamp on any reading (default: scale)
     windowSeconds: 60 # Span of raw reports averaged per poll (default: analytics.aggregatePeriod)
 ```
 
@@ -149,14 +142,14 @@ span, and a node that receives nothing but GTM's polls reads `max` on every poll
 the window. A clamped value is logged once at load.
 
 `scale` only sets the resolution of the number; GTM compares datacenters relative to each other. `max` is
-a fail-safe, not a working range: it is what a node reports when its analytics are missing, so GTM
-shifts traffic away from it. The GTM resource's upper bound must be 0 (no check) or at least `max`, or
-GTM rejects the fail-safe value as invalid.
+what a node reports when its load cannot be measured, so GTM shifts traffic away from it; by default it
+equals `scale`, the reading of a fully busy node, so it is the same value 1.0.0 reported. The GTM resource's
+upper bound must be 0 (no check) or at least `max`, or GTM rejects the fail-safe value as invalid.
 
 **Examples:**
 
-Default, two workers, 0.08 requests in flight per worker on average → `load:80`
+Default, two workers, each event loop busy 8% of the window → `load:80`
 
-Saturated node, handler times stretched, 1.5 requests in flight per worker → `load:1500`
+Saturated node, every worker's event loop busy the whole window → `load:1000`
 
-Analytics not being written → `load:100000`
+Analytics not being written → `load:1000`

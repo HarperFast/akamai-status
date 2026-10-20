@@ -5,7 +5,6 @@
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert';
 import { readFileSync } from 'node:fs';
-import { Worker } from 'node:worker_threads';
 
 const warnings = [];
 let operationHandler;
@@ -34,28 +33,41 @@ globalThis.databases = {
 	},
 };
 
-const { status, current_load_for_gtm } = await import('./resources.js');
-
-function duration(path, count, mean, method = 'GET') {
-	return { metric: 'duration', path, method, count, mean };
+// A module instance counts reports only from when it loaded, so every instance here loads at a time
+// well before the windows the tests ask about.
+const realDateNow = Date.now;
+let now = 1_000_000;
+function importEarlier(specifier, loadedBefore = 3_600_000) {
+	const at = now - loadedBefore;
+	Date.now = () => at;
+	return import(specifier).finally(() => {
+		Date.now = () => now;
+	});
 }
+
+const { status, current_load_for_gtm } = await importEarlier('./resources.js');
+Date.now = realDateNow;
+
+function utilization(active, idle) {
+	return { metric: 'utilization', idle, active, utilization: active / (active + idle) };
+}
+
+const profilerSampling = { metric: 'profiler-sampling', total: 1_000, count: 1 };
 
 function report(id, threadId, metrics) {
 	return { id, time: Math.floor(id), period: 1000.2, threadId, metrics };
 }
 
+// Two workers over the default 60 s window: 48 s of event-loop time busy out of 120 s.
 function windowReports() {
 	return [
-		report(1_000_000 - 50_000, 1, [
-			duration('/resource', 4_000, 2),
-			{ metric: 'success', path: '/resource', total: 4_000, count: 4_000 },
+		report(now - 30_000, 1, [
+			utilization(12_000, 18_000),
+			{ metric: 'duration', path: '/resource', count: 9, mean: 2 },
 		]),
-		report(1_000_000 - 40_000, 2, [duration('/resource', 3_000, 10, 'POST')]),
-		report(1_000_000 - 30_000, 1, [
-			duration('/resource', 5_000, 2),
-			{ metric: 'memory', threadId: 1, byThread: true, rss: 1 },
-		]),
-		report(1_000_000 - 20_000, 2, [{ metric: 'utilization', idle: 1, active: 1, utilization: 0.5 }]),
+		report(now - 10_000, 2, [utilization(24_000, 26_000), { metric: 'memory', threadId: 2, byThread: true, rss: 1 }]),
+		report(now - 5_000, 0, [{ metric: 'duration', path: 'describe_all', type: 'operation', count: 1, mean: 7_000 }]),
+		report(now - 1_000, 1, [utilization(12_000, 17_000)]),
 	];
 }
 
@@ -64,7 +76,7 @@ async function* asyncIterable(rows) {
 }
 
 function serving(reports) {
-	return () => asyncIterable(reports);
+	return () => asyncIterable(typeof reports === 'function' ? reports() : reports);
 }
 
 // Unedited hdb_raw_analytics rows captured from real nodes.
@@ -72,12 +84,23 @@ function capturedReports(name) {
 	return JSON.parse(readFileSync(new URL(`./fixtures/${name}.json`, import.meta.url), 'utf8'));
 }
 
-function busyMsOf(reports) {
-	let busy = 0;
-	for (const { metrics } of reports) {
-		for (const entry of metrics) if (entry.metric === 'duration') busy += entry.count * entry.mean;
+// Active event-loop time inside the window, the span of each sample clipped to it, unflagged only.
+function activeInside(reports, windowStart) {
+	let active = 0;
+	for (const { id, metrics } of reports) {
+		const sample = metrics.find((entry) => entry.metric === 'utilization');
+		if (!sample || metrics.some((entry) => entry.metric === 'profiler-sampling')) continue;
+		const span = sample.active + sample.idle;
+		const inside = Math.min(span, id - windowStart);
+		if (inside > 0) active += (sample.active * inside) / span;
 	}
-	return busy;
+	return active;
+}
+
+// Moves captured reports so the newest lands at the current time, keeping their spacing.
+function rebased(reports) {
+	const shift = now - Math.max(...reports.map((row) => row.id));
+	return reports.map((row) => ({ ...row, id: row.id + shift, time: row.time + shift }));
 }
 
 async function loadBody() {
@@ -85,43 +108,14 @@ async function loadBody() {
 	return response.data;
 }
 
-function loadOnWorker(reports) {
-	return new Promise((resolve, reject) => {
-		const worker = new Worker(
-			`
-			const { parentPort, workerData } = require('node:worker_threads');
-			globalThis.logger = { warn() {}, info() {}, error() {}, notify() {}, trace() {}, debug() {} };
-			globalThis.Resource = class {};
-			globalThis.server = { workerCount: 2, config: {} };
-			globalThis.databases = {
-				system: { hdb_raw_analytics: { search: async function* () { yield* workerData.reports; } } },
-			};
-			import(workerData.module).then(
-				async ({ current_load_for_gtm }) => parentPort.postMessage((await new current_load_for_gtm().get()).data),
-				(error) => parentPort.postMessage('import failed: ' + error.message)
-			);
-			`,
-			{ eval: true, workerData: { reports, module: new URL('./resources.js', import.meta.url).href } }
-		);
-		worker.once('message', (body) => {
-			worker.terminate();
-			resolve(body);
-		});
-		worker.once('error', reject);
-	});
-}
-
 // Degraded state is module-level and deliberately persists across polls, so a test that asserts
 // warning counts has to start from a known-healthy state rather than whatever ran before it.
 async function startHealthy() {
-	searchHandler = serving(windowReports());
+	searchHandler = serving(windowReports);
 	now += 60_000;
 	await loadBody();
 	warnings.length = 0;
 }
-
-let now = 1_000_000;
-const realDateNow = Date.now;
 
 describe('current_load_for_gtm', () => {
 	beforeEach(() => {
@@ -134,36 +128,40 @@ describe('current_load_for_gtm', () => {
 		Date.now = realDateNow;
 	});
 
-	it("sums handler time over every worker's reports in the window and divides by the window and the worker count", async () => {
-		searchHandler = serving(windowReports());
+	it('sums event-loop busy time inside the window over every worker and divides by the window and the worker count', async () => {
+		searchHandler = serving(windowReports);
 
 		assert.equal(await loadBody(), 'load:400');
 	});
 
 	it("returns a plain text body so GTM's leader-string parse sees load:N unquoted", async () => {
-		searchHandler = serving(windowReports());
+		searchHandler = serving(windowReports);
 
 		const response = await new current_load_for_gtm().get();
 		assert.equal(response.contentType, 'text/plain');
 		assert.match(response.data, /^load:\d+$/);
 	});
 
-	it('reports more than scale when every worker is more than continuously busy, and only max clamps it', async () => {
-		searchHandler = serving([report(now - 1_000, 1, [duration('/resource', 180_000, 1)])]);
-		assert.equal(await loadBody(), 'load:1500');
-
-		now += 60_000;
-		searchHandler = serving([report(now - 1_000, 1, [duration('/resource', 240_000, 100)])]);
-		assert.equal(await loadBody(), 'load:100000');
-	});
-
-	it('weights requests by handler time, so an expensive request counts for more than a cheap one', async () => {
+	it('reads scale, its ceiling, when every worker is busy the whole window', async () => {
 		searchHandler = serving([
-			report(now - 2_000, 1, [duration('/cached', 1_000, 1)]),
-			report(now - 1_000, 2, [duration('/query', 1_000, 50)]),
+			report(now - 1, 1, [utilization(90_000, 0)]),
+			report(now - 1, 2, [utilization(60_000, 0)]),
 		]);
 
-		assert.equal(await loadBody(), 'load:425');
+		assert.equal(await loadBody(), 'load:1000');
+	});
+
+	it("counts only the part of a sample's span that falls inside the window", async () => {
+		// 20 s of samples, 5 s of them inside the window, half busy.
+		searchHandler = serving([report(now - 55_000, 1, [utilization(10_000, 10_000)])]);
+
+		assert.equal(await loadBody(), 'load:21');
+	});
+
+	it('counts a worker that wrote no report in the window as idle', async () => {
+		searchHandler = serving([report(now, 1, [utilization(60_000, 0)])]);
+
+		assert.equal(await loadBody(), 'load:500');
 	});
 
 	it('asks only for reports written inside the window, by id, so core pins the key range', async () => {
@@ -183,7 +181,7 @@ describe('current_load_for_gtm', () => {
 
 	it('uses a configured window for both the query and the denominator', async () => {
 		server.config = { akamaiStatus: { loadThresholds: { windowSeconds: 30 } } };
-		const { current_load_for_gtm: shortWindow } = await import('./resources.js?window=30');
+		const { current_load_for_gtm: shortWindow } = await importEarlier('./resources.js?window=30');
 		server.config = {};
 		const requests = [];
 		searchHandler = (received) => {
@@ -191,14 +189,14 @@ describe('current_load_for_gtm', () => {
 			return asyncIterable(windowReports());
 		};
 
-		assert.equal((await new shortWindow().get()).data, 'load:800');
+		assert.equal((await new shortWindow().get()).data, 'load:360');
 		assert.equal(requests[0].conditions[0].value, now - 30_000);
 	});
 
 	it('clamps the window to the GTM poll interval below and the raw retention above, and says so', async () => {
 		server.config = { akamaiStatus: { loadThresholds: { windowSeconds: 5 } } };
 		warnings.length = 0;
-		const { current_load_for_gtm: tooShort } = await import('./resources.js?window=5');
+		const { current_load_for_gtm: tooShort } = await importEarlier('./resources.js?window=5');
 		assert.equal(warnings.length, 1);
 		assert.match(warnings[0], /5s clamped to 30s/);
 
@@ -207,7 +205,7 @@ describe('current_load_for_gtm', () => {
 			akamaiStatus: { loadThresholds: { windowSeconds: 600 } },
 		};
 		warnings.length = 0;
-		const { current_load_for_gtm: tooLong } = await import('./resources.js?window=600');
+		const { current_load_for_gtm: tooLong } = await importEarlier('./resources.js?window=600');
 		assert.equal(warnings.length, 1);
 		assert.match(warnings[0], /600s clamped to 120s/);
 
@@ -218,13 +216,13 @@ describe('current_load_for_gtm', () => {
 			akamaiStatus: { loadThresholds: { windowSeconds: 60 } },
 		};
 		warnings.length = 0;
-		await import('./resources.js?window=short-period');
+		await importEarlier('./resources.js?window=short-period');
 		assert.match(warnings[0], /60s clamped to 10s/);
 
 		// rawRetentionMs of 0 means one period to core, not the one-hour default.
 		server.config = { analytics: { rawRetentionMs: 0 }, akamaiStatus: { loadThresholds: { windowSeconds: 600 } } };
 		warnings.length = 0;
-		await import('./resources.js?window=zero-retention');
+		await importEarlier('./resources.js?window=zero-retention');
 		server.config = {};
 		assert.match(warnings[0], /600s clamped to 60s/);
 
@@ -233,7 +231,7 @@ describe('current_load_for_gtm', () => {
 			requests.push(received);
 			return asyncIterable(windowReports());
 		};
-		assert.equal((await new tooShort().get()).data, 'load:800');
+		assert.equal((await new tooShort().get()).data, 'load:360');
 		assert.equal(requests.at(-1).conditions[0].value, now - 30_000);
 		assert.equal((await new tooLong().get()).data, 'load:200');
 		assert.equal(requests.at(-1).conditions[0].value, now - 120_000);
@@ -243,12 +241,12 @@ describe('current_load_for_gtm', () => {
 		const savedCount = server.workerCount;
 		delete server.workerCount;
 		server.config = { threads: { count: 4 } };
-		const { current_load_for_gtm: fourWorkers } = await import('./resources.js?workers=config');
+		const { current_load_for_gtm: fourWorkers } = await importEarlier('./resources.js?workers=config');
 		server.config = {};
-		const { current_load_for_gtm: oneWorker } = await import('./resources.js?workers=none');
+		const { current_load_for_gtm: oneWorker } = await importEarlier('./resources.js?workers=none');
 		server.workerCount = savedCount;
 		warnings.length = 0;
-		searchHandler = serving(windowReports());
+		searchHandler = serving(windowReports);
 
 		assert.equal((await new fourWorkers().get()).data, 'load:200');
 		assert.equal((await new oneWorker().get()).data, 'load:800');
@@ -259,7 +257,7 @@ describe('current_load_for_gtm', () => {
 		delete server.workerCount;
 		server.config = {};
 		warnings.length = 0;
-		await import('./resources.js?workers=unknown');
+		await importEarlier('./resources.js?workers=unknown');
 		server.workerCount = savedCount;
 
 		assert.equal(warnings.length, 1);
@@ -271,90 +269,116 @@ describe('current_load_for_gtm', () => {
 			analytics: { aggregatePeriod: 'soon' },
 			akamaiStatus: { loadThresholds: { scale: 'abc', max: -5, windowSeconds: 0 } },
 		};
-		const { current_load_for_gtm: misconfigured } = await import('./resources.js?config=invalid');
+		const { current_load_for_gtm: misconfigured } = await importEarlier('./resources.js?config=invalid');
 		server.config = {};
-		searchHandler = serving(windowReports());
+		searchHandler = serving(windowReports);
 
 		assert.equal((await new misconfigured().get()).data, 'load:400');
 	});
 
-	it('reports max load, not idle, when a duration entry lacks a numeric count or mean', async () => {
-		const { count, ...noCount } = duration('/resource', 9_000, 2);
-		searchHandler = serving([report(now - 1_000, 1, [noCount])]);
-		assert.equal(await loadBody(), 'load:100000');
-		assert.match(warnings.at(-1), /no count/);
-
-		now += 60_000;
-		searchHandler = serving(windowReports());
-		await loadBody();
-
-		now += 60_000;
-		searchHandler = serving([report(now - 1_000, 1, [{ ...duration('/resource', 9_000, 2), mean: null }])]);
-		assert.equal(await loadBody(), 'load:100000');
-		assert.match(warnings.at(-1), /no mean/);
-
-		now += 60_000;
+	it('leaves reports flagged by the profiler out of both the busy time and the time it divides by', async () => {
 		searchHandler = serving([
-			report(now - 1_000, 1, [{ metric: 'duration', path: '/resource', method: 'GET', count: 0 }]),
+			report(now, 1, [utilization(50_000, 10_000), profilerSampling]),
+			report(now, 2, [utilization(6_000, 54_000)]),
 		]);
-		assert.equal(await loadBody(), 'load:0');
+
+		assert.equal(await loadBody(), 'load:100');
 	});
 
-	it('reproduces an idle stage node from captured reports', async () => {
-		await startHealthy();
-		// us-east1-b-1 on lfct1: 60 s of GTM liveness and load polls only, two workers.
-		searchHandler = serving(capturedReports('raw-idle-lfct1'));
-		now += 60_000;
+	it('ignores reports from before the component started, and reads max until it has measured a window', async () => {
+		const { current_load_for_gtm: restarted } = await importEarlier('./resources.js?restart', 20_000);
+		warnings.length = 0;
+		searchHandler = serving(windowReports);
+		assert.equal((await new restarted().get()).data, 'load:1000');
+		assert.match(warnings.at(-1), /since this component started/);
 
-		assert.equal(await loadBody(), 'load:0');
+		now += 40_000;
+		searchHandler = serving([report(now, 1, [utilization(30_000, 30_000)]), report(now, 2, [utilization(0, 60_000)])]);
+		assert.equal((await new restarted().get()).data, 'load:250');
+	});
+
+	it('reports max load while the profiler sampled most of the window', async () => {
+		searchHandler = serving([
+			report(now, 1, [utilization(42_000, 18_000), profilerSampling]),
+			report(now, 2, [utilization(40_000, 20_000), profilerSampling]),
+		]);
+
+		assert.equal(await loadBody(), 'load:1000');
+		assert.match(warnings.at(-1), /profiler sampled most of the last 60s/);
+	});
+
+	it('reports max load, not idle, when a utilization entry lacks numeric active or idle time', async () => {
+		const { active, ...noActive } = utilization(1_000, 2_000);
+		searchHandler = serving([report(now - 1_000, 1, [noActive])]);
+		assert.equal(await loadBody(), 'load:1000');
+		assert.match(warnings.at(-1), /no active or idle time/);
+
+		now += 60_000;
+		searchHandler = serving([report(now - 1_000, 1, [{ ...utilization(1_000, 2_000), idle: null }])]);
+		assert.equal(await loadBody(), 'load:1000');
+	});
+
+	it('reports max load when the reports in the window carry no utilization, as on a single-threaded node', async () => {
+		await startHealthy();
+		now += 60_000;
+		searchHandler = serving([report(now - 1_000, 0, [{ metric: 'duration', path: '/resource', count: 6, mean: 10 }])]);
+
+		assert.equal(await loadBody(), 'load:1000');
+		assert.match(warnings.at(-1), /carries event-loop utilization/);
+	});
+
+	it('reproduces an idle harper-pro node from captured reports, after its startup sampling', async () => {
+		await startHealthy();
+		now += 60_000;
+		// Two workers, GTM-like polls only, harper-pro with the profiler's sampling window.
+		const captured = rebased(capturedReports('raw-idle-pro'));
+		searchHandler = serving(captured);
+
+		const expected = Math.round((activeInside(captured, now - 60_000) / 120_000) * 1000);
+		assert.ok(expected <= 10, `idle reads ${expected}`);
+		assert.equal(await loadBody(), `load:${expected}`);
 		assert.equal(warnings.length, 0);
 	});
 
-	it('reproduces a busy local node from captured reports', async () => {
-		// A local two-worker instance: 2,000 keep-alive GETs and one POST on an exported table,
-		// all served by one worker, 300 ms of handler time over the 60 s window.
-		const captured = capturedReports('raw-busy-local');
+	it('reports max load during the profiler sampling right after a harper-pro start', async () => {
+		const captured = rebased(capturedReports('raw-startup-pro'));
 		searchHandler = serving(captured);
 
-		const expected = Math.round((busyMsOf(captured) / 60_000 / 2) * 1000);
-		assert.equal(expected, 2);
+		assert.ok(
+			captured.every(
+				(row) =>
+					!row.metrics.some((entry) => entry.metric === 'utilization') ||
+					row.metrics.some((entry) => entry.metric === 'profiler-sampling')
+			)
+		);
+		assert.equal(await loadBody(), 'load:1000');
+	});
+
+	it('reads the profiler-inflated idle of harper-pro 5.3 as busy, which is why it needs the profiler fix', async () => {
+		// us-east1-b-1 on lfct1, harper-pro 5.3.0 with profiling on: 60 s of GTM polls only.
+		const captured = rebased(capturedReports('raw-idle-lfct1'));
+		searchHandler = serving(captured);
+
+		const expected = Math.round((activeInside(captured, now - 60_000) / 120_000) * 1000);
+		assert.ok(expected > 600, `5.3 idle reads ${expected}`);
 		assert.equal(await loadBody(), `load:${expected}`);
 	});
 
-	it("skips the main thread's reports, where the operations API runs, when the component runs on a worker", async () => {
-		// The operations port also serves Fastify routes, and core records a rejected login there with
-		// no type, so a type filter alone would not keep that thread's work out.
-		const idle = capturedReports('raw-idle-lfct1');
-		const portRoutes = [
-			{ metric: 'duration', path: '/api/openapi/rest', type: 'fastify-route', count: 1, mean: 3_000 },
-			duration('/', 3, 1, 'POST'),
-		];
-		const mainThread = report(now - 1_000, 0, [
-			{ metric: 'duration', path: 'get_analytics', type: 'operation', count: 1, mean: 7_200 },
-			...portRoutes,
-		]);
+	it('reproduces a busy local node from captured reports', async () => {
+		// A local two-worker core instance, no profiler: 2,000 keep-alive GETs and one POST on an
+		// exported table, all served by one worker.
+		const captured = rebased(capturedReports('raw-busy-local'));
+		searchHandler = serving(captured);
 
-		assert.equal(await loadOnWorker([...idle, mainThread]), 'load:0');
-		const expected = Math.round(((busyMsOf(idle) + 3_003) / 60_000 / 2) * 1000);
-		assert.equal(expected, 25);
-		assert.equal(await loadOnWorker([...idle, report(now - 1_000, 1, portRoutes)]), `load:${expected}`);
-	});
-
-	it("counts the main thread's HTTP work on a single-threaded node, but not its operations", async () => {
-		searchHandler = serving([
-			report(now - 1_000, 0, [
-				duration('/resource', 6_000, 10),
-				{ metric: 'duration', path: 'sql', type: 'operation', count: 1, mean: 12_000 },
-			]),
-		]);
-
-		assert.equal(await loadBody(), 'load:500');
+		const expected = Math.round((activeInside(captured, now - 60_000) / 120_000) * 1000);
+		assert.ok(expected > 0, `busy reads ${expected}`);
+		assert.equal(await loadBody(), `load:${expected}`);
 	});
 
 	it('reports max load when no report was written in the window', async () => {
 		searchHandler = serving([]);
 
-		assert.equal(await loadBody(), 'load:100000');
+		assert.equal(await loadBody(), 'load:1000');
 		assert.equal(warnings.length, 1);
 		assert.match(warnings[0], /no analytics reports in the last 60s/);
 	});
@@ -364,7 +388,7 @@ describe('current_load_for_gtm', () => {
 			throw new Error('boom');
 		};
 
-		assert.equal(await loadBody(), 'load:100000');
+		assert.equal(await loadBody(), 'load:1000');
 	});
 
 	it('warns once per degraded episode, not once per poll', async () => {
@@ -405,7 +429,7 @@ describe('current_load_for_gtm', () => {
 		await loadBody();
 
 		now += 60_000;
-		searchHandler = serving(windowReports());
+		searchHandler = serving(windowReports);
 		assert.equal(await loadBody(), 'load:400');
 
 		assert.equal(warnings.length, 2);
