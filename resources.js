@@ -97,9 +97,10 @@ async function getBusyFraction() {
 	let busyMs = 0;
 	let sampledMs = 0;
 	for await (const report of reports) {
+		if (report.id < loadedAt) continue;
 		sawReport = true;
 		const metrics = report.metrics ?? [];
-		// Core attaches utilization to HTTP worker reports only.
+		// Core attaches utilization to worker threads' reports; the main thread's carry none.
 		const utilization = metrics.find((entry) => entry.metric === 'utilization');
 		if (!utilization) continue;
 		const { active, idle } = utilization;

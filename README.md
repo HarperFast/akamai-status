@@ -79,9 +79,10 @@ Utilization counts everything a worker's event loop runs, not only the requests 
 work on the workers raises it too and makes GTM shift traffic away. Akamai's load feedback guidance asks for
 a value that changes only with the traffic GTM sends; this component departs from that on purpose, for a
 measure with an objective ceiling. Utilization does not see time a request spends waiting on storage or an
-origin, because the event loop is idle while it waits, nor work on other threads: the main thread, which
-serves the operations API, and native threads. A single saturated worker among idle ones shows only as its
-share of the average.
+origin, because the event loop is idle while it waits, nor work on the main thread, which serves the
+operations API, or on native threads. Other worker threads, such as import and export jobs, report
+utilization too, and their busy time counts against the HTTP workers' time, so a long job can raise the
+reading. A single saturated worker among idle ones shows only as its share of the average.
 
 harper-pro's profiler inflates utilization while it samples, to about 0.7 on an idle worker. From
 harper-pro 5.4 ([HarperFast/harper-pro#1012](https://github.com/HarperFast/harper-pro/pull/1012)) it

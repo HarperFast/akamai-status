@@ -58,7 +58,6 @@ function report(id, threadId, metrics) {
 	return { id, time: Math.floor(id), period: 1000.2, threadId, metrics };
 }
 
-// Two workers over the default 60 s window: 48 s of event-loop time busy out of 120 s.
 function windowReports() {
 	return [
 		report(now - 30_000, 1, [
@@ -84,7 +83,6 @@ function capturedReports(name) {
 	return JSON.parse(readFileSync(new URL(`./fixtures/${name}.json`, import.meta.url), 'utf8'));
 }
 
-// Active event-loop time inside the window, the span of each sample clipped to it, unflagged only.
 function activeInside(reports, windowStart) {
 	let active = 0;
 	for (const { id, metrics } of reports) {
@@ -97,7 +95,6 @@ function activeInside(reports, windowStart) {
 	return active;
 }
 
-// Moves captured reports so the newest lands at the current time, keeping their spacing.
 function rebased(reports) {
 	const shift = now - Math.max(...reports.map((row) => row.id));
 	return reports.map((row) => ({ ...row, id: row.id + shift, time: row.time + shift }));
@@ -152,7 +149,6 @@ describe('current_load_for_gtm', () => {
 	});
 
 	it("counts only the part of a sample's span that falls inside the window", async () => {
-		// 20 s of samples, 5 s of them inside the window, half busy.
 		searchHandler = serving([report(now - 55_000, 1, [utilization(10_000, 10_000)])]);
 
 		assert.equal(await loadBody(), 'load:21');
@@ -291,6 +287,11 @@ describe('current_load_for_gtm', () => {
 		searchHandler = serving(windowReports);
 		assert.equal((await new restarted().get()).data, 'load:1000');
 		assert.match(warnings.at(-1), /since this component started/);
+
+		// Half a window after loading, the previous run's reports alone must not read as idle.
+		const { current_load_for_gtm: halfWindow } = await importEarlier('./resources.js?restart-half', 30_000);
+		searchHandler = serving([report(now - 40_000, 1, [utilization(1_000, 9_000)])]);
+		assert.equal((await new halfWindow().get()).data, 'load:1000');
 
 		now += 40_000;
 		searchHandler = serving([report(now, 1, [utilization(30_000, 30_000)]), report(now, 2, [utilization(0, 60_000)])]);
