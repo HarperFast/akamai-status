@@ -171,11 +171,16 @@ function getLoad() {
 	return pendingLoad;
 }
 
+// `hidden` keeps both resources out of Harper's MCP tools and OpenAPI document. REST routing and
+// authorization do not read it.
+
 /**
  * GET /status
  * Returns HTTP 200 when system status is "Available", 404 otherwise.
  */
 export class status extends Resource {
+	static hidden = true;
+
 	allowRead() {
 		return true;
 	}
@@ -206,6 +211,8 @@ export class status extends Resource {
  * Returns server load for Akamai in format "load:N", from the HTTP workers' event-loop utilization.
  */
 export class current_load_for_gtm extends Resource {
+	static hidden = true;
+
 	allowRead() {
 		return true;
 	}

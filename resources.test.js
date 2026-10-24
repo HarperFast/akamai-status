@@ -512,3 +512,22 @@ describe('status', () => {
 		]);
 	});
 });
+
+// Harper lists a Resource as an MCP tool and an OpenAPI path unless it is `static hidden`. Only those
+// two read the flag, so the REST handler tests above are the proof that routes are unchanged.
+describe('MCP and OpenAPI exposure', () => {
+	for (const [name, ResourceClass] of Object.entries({ status, current_load_for_gtm })) {
+		it(`hides ${name} from MCP tools and the OpenAPI document`, () => {
+			assert.equal(ResourceClass.hidden, true);
+		});
+
+		it(`keeps ${name} readable without credentials, as Akamai polls it anonymously`, () => {
+			assert.equal(new ResourceClass().allowRead(), true);
+		});
+	}
+
+	it('leaves POST and DELETE /status on the default super_user-only authorization', () => {
+		assert.equal(Object.hasOwn(status.prototype, 'allowCreate'), false);
+		assert.equal(Object.hasOwn(status.prototype, 'allowDelete'), false);
+	});
+});
