@@ -11,6 +11,10 @@ This component provides endpoints for Akamai services to determine Harper instan
 | `/current_load_for_gtm`              | GET           | Load feedback for Akamai GTM          |
 | `/akamai/sureroute-test-object.html` | GET           | Static HTML for SureRoute testing     |
 
+Both resources set `static hidden = true`, so on Harper 5.1+ they are left out of MCP tools and resources
+and the OpenAPI document. They are infrastructure routes for GTM; without this, an MCP client signed in as
+a `super_user` would see `delete_status` as a tool it can call. REST serves them as usual.
+
 This component supersedes [`status-check-fabric`](https://github.com/HarperFast/status-check-fabric) and
 [`akamai-sureroute-test-object`](https://github.com/HarperFast/akamai-sureroute-test-object), which it is a
 drop-in superset of.

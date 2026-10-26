@@ -468,6 +468,13 @@ describe('current_load_for_gtm', () => {
 	});
 });
 
+describe('MCP and OpenAPI', () => {
+	it('hides both resources from MCP tools and OpenAPI (REST still serves them)', () => {
+		assert.equal(status.hidden, true);
+		assert.equal(current_load_for_gtm.hidden, true);
+	});
+});
+
 describe('status', () => {
 	beforeEach(() => {
 		warnings.length = 0;
