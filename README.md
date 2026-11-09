@@ -271,12 +271,15 @@ Analytics not being written → `load:1000`
 Releases are cut automatically from `main` by [semantic-release](https://semantic-release.gitbook.io/), which
 reads [Conventional Commits](https://www.conventionalcommits.org/) to pick the next version: `feat` is a minor,
 a `!` or `BREAKING CHANGE:` footer is a major, and every other type is a patch. It tags the release, writes
-the GitHub release notes, and commits the version back to `main`; the workflow then publishes to npm through
-trusted publishing, with provenance.
+the GitHub release notes, and commits the version back to `main`; a separate job then publishes the tag to npm
+through trusted publishing, with provenance.
 
-The tag and GitHub release are made before the npm publish. If the publish fails, run the Release workflow
-manually on `main` before anything else merges: it publishes only when `main`'s HEAD is the tagged release
-commit, and the next merge releases a new version instead.
+That job publishes the newest release tag whenever npm doesn't have its version. If a publish fails, re-run the
+Release workflow, or run it manually on `main`, before anything else merges: once a newer version is released,
+the failed one stays unpublished.
 
-Commits and PR titles are checked with commitlint, since a squash merge uses the PR title as the commit
-message semantic-release reads. To check a message locally: `echo "fix: handle empty window" | npx commitlint`.
+semantic-release reads the squash commit. With this repo's merge settings, its title is the PR title, or the
+commit's own title for a single-commit PR, and its body holds every commit's full message: a `BREAKING CHANGE:`
+footer in any of them makes a major, and the release notes keep everything after that footer. Trim the body when
+merging. Commit messages and PR titles are checked with commitlint; to check one locally:
+`echo "fix: handle empty window" | npx commitlint`.
