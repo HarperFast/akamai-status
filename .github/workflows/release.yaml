@@ -16,6 +16,7 @@ concurrency:
 jobs:
   release:
     name: Release
+    if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -44,13 +45,14 @@ jobs:
         run: npx --no semantic-release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      # Gated on npm rather than on this run's release, so re-running a run whose publish failed publishes it
+      # Gated on npm rather than on this run's release, so re-running a run whose publish failed publishes it.
+      # A re-run's HEAD predates its release commit, which only origin/main reaches.
       - name: Find the newest release missing from npm
         id: unpublished
         run: |
-          tag=$(git tag --list 'v*' --sort=-version:refname | head -n 1)
+          tag=$({ git tag --list 'v*' --merged HEAD; git tag --list 'v*' --merged origin/main; } | sort -uV | tail -n 1)
           versions=$(npm view "$(node -p "require('./package.json').name")" versions --json)
-          if ! jq -e --arg version "${tag#v}" 'index($version)' <<< "$versions" > /dev/null; then
+          if ! jq -e --arg version "${tag#v}" 'index($version) != null' <<< "$versions" > /dev/null; then
             echo "tag=$tag" >> "$GITHUB_OUTPUT"
           fi
 
@@ -76,4 +78,8 @@ jobs:
           node-version-file: '.nvmrc'
           registry-url: 'https://registry.npmjs.org'
       - name: Publish to npm
-        run: npm publish --provenance
+        env:
+          TAG: ${{ needs.release.outputs.tag }}
+        run: |
+          test "v$(node -p "require('./package.json').version")" = "$TAG"
+          npm publish --provenance
