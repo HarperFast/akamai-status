@@ -36,7 +36,6 @@
 		"access": "public"
 	},
 	"scripts": {
-		"commitlint": "commitlint --edit",
 		"format": "prettier --write .",
 		"format:check": "prettier --check .",
 		"test": "node --test resources.test.js"

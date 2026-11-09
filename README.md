@@ -274,5 +274,9 @@ a `!` or `BREAKING CHANGE:` footer is a major, and every other type is a patch. 
 the GitHub release notes, and commits the version back to `main`; the workflow then publishes to npm through
 trusted publishing, with provenance.
 
+The tag and GitHub release are made before the npm publish. If the publish fails, run the Release workflow
+manually on `main` before anything else merges: it publishes only when `main`'s HEAD is the tagged release
+commit, and the next merge releases a new version instead.
+
 Commits and PR titles are checked with commitlint, since a squash merge uses the PR title as the commit
 message semantic-release reads. To check a message locally: `echo "fix: handle empty window" | npx commitlint`.

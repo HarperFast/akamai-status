@@ -1,6 +1,5 @@
 name: PR Title
-# A squash merge of a multi-commit PR uses the PR title as the commit semantic-release reads.
-# Its own workflow, so a body edit re-checks the title instead of writing a skipped Verify result.
+# A squash merge of a multi-commit PR uses the PR title as the commit semantic-release reads
 on:
   pull_request:
     branches: [main]
@@ -28,4 +27,4 @@ jobs:
       - name: Lint PR title
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
-        run: printf '%s\n' "$PR_TITLE" | npx commitlint
+        run: printf '%s\n' "$PR_TITLE" | npx commitlint --config .github/commitlint-title.json
