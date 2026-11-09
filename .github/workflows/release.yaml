@@ -24,6 +24,7 @@ jobs:
       pull-requests: write
     outputs:
       tag: ${{ steps.unpublished.outputs.tag }}
+      sha: ${{ steps.unpublished.outputs.sha }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -54,6 +55,7 @@ jobs:
           versions=$(npm view "$(node -p "require('./package.json').name")" versions --json)
           if ! jq -e --arg version "${tag#v}" 'index($version) != null' <<< "$versions" > /dev/null; then
             echo "tag=$tag" >> "$GITHUB_OUTPUT"
+            echo "sha=$(git rev-parse "$tag^{commit}")" >> "$GITHUB_OUTPUT"
           fi
 
   publish:
@@ -67,10 +69,11 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - name: Checkout the release tag
+      # The commit the release job selected, so a tag moved since then can't change what is published
+      - name: Checkout the release commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: refs/tags/${{ needs.release.outputs.tag }}
+          ref: ${{ needs.release.outputs.sha }}
           persist-credentials: false
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
