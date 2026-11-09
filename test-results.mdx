@@ -3,6 +3,7 @@
 ## Component Overview
 
 This component provides three endpoints for Akamai services:
+
 - `GET /status` - Health check (HTTP 200 when Available, 404 otherwise)
 - `GET /current_load_for_gtm` - Load feedback for Akamai GTM (format: `load:N`)
 - `GET /akamai/sureroute-test-object.html` - Static HTML for SureRoute testing
@@ -54,6 +55,7 @@ HTTP: 404
 # Empty string
 curl -sk -X POST ... -d '{"operation":"set_status","id":"availability","status":""}'
 ```
+
 ```
 {"error":"Status \"availability\" only accepts these values: Available, Unavailable. 'status' is not allowed to be empty"}
 ```
@@ -62,15 +64,16 @@ curl -sk -X POST ... -d '{"operation":"set_status","id":"availability","status":
 # Random string
 curl -sk -X POST ... -d '{"operation":"set_status","id":"availability","status":"gibberish"}'
 ```
+
 ```
 {"error":"Status \"availability\" only accepts these values: Available, Unavailable"}
 ```
 
-| Test | Input | HTTP Code | Result |
-|---|---|---|---|
-| 1.1 | Available | 200 | PASS |
-| 1.2 | Unavailable | 404 | PASS |
-| 1.3 | Empty / Invalid | Rejected | PASS |
+| Test | Input           | HTTP Code | Result |
+| ---- | --------------- | --------- | ------ |
+| 1.1  | Available       | 200       | PASS   |
+| 1.2  | Unavailable     | 404       | PASS   |
+| 1.3  | Empty / Invalid | Rejected  | PASS   |
 
 ### TEST 1.4: SureRoute Test Object
 
@@ -104,6 +107,7 @@ curl -sk https://nl-ams-1.v5-testing.akamai.stage.harperfabric.com/debug_load
 ### TEST 2.2: Custom Scale (100)
 
 **Config:**
+
 ```yaml
 akamaiStatus:
   loadThresholds:
@@ -125,6 +129,7 @@ curl -sk https://nl-ams-1.v5-testing.akamai.stage.harperfabric.com/debug_load
 ### TEST 2.3: Custom Max (500)
 
 **Config:**
+
 ```yaml
 akamaiStatus:
   loadThresholds:
@@ -144,11 +149,11 @@ curl -sk https://nl-ams-1.v5-testing.akamai.stage.harperfabric.com/debug_load
 
 `0.7146 × 1000 = 714`, capped at 500 ✓ **PASS**
 
-| Test | Configuration | Formula | Result |
-|---|---|---|---|
-| 2.1 | Default | `utilization × 1000` | PASS |
-| 2.2 | scale: 100 | `utilization × 100` | PASS |
-| 2.3 | max: 500 | `min(utilization × 1000, 500)` | PASS |
+| Test | Configuration | Formula                        | Result |
+| ---- | ------------- | ------------------------------ | ------ |
+| 2.1  | Default       | `utilization × 1000`           | PASS   |
+| 2.2  | scale: 100    | `utilization × 100`            | PASS   |
+| 2.3  | max: 500      | `min(utilization × 1000, 500)` | PASS   |
 
 ---
 
@@ -180,12 +185,12 @@ Four different node names, four different utilization values. **PASS**
 
 Stress applied to us-lax-1 only (k6, 50 VUs, 30s):
 
-| Node | Load |
-|---|---|
-| nl-ams-1 | 718 |
-| se-sto-1 | 705 |
+| Node         | Load               |
+| ------------ | ------------------ |
+| nl-ams-1     | 718                |
+| se-sto-1     | 705                |
 | **us-lax-1** | **877** ← stressed |
-| us-ord-1 | 694 |
+| us-ord-1     | 694                |
 
 Only the stressed node reports elevated load. **PASS**
 
@@ -198,15 +203,15 @@ Only the stressed node reports elevated load. **PASS**
 
 ### GTM Configuration
 
-| Setting | Value |
-|---|---|
-| Property Type | Weighted Random Load Balancing with Load Feedback |
-| Resource Name | load |
-| Resource Type | Non-XML load object via HTTP |
-| Load Leader String | `load:` |
-| Upper Bound | 1000 (Oct 1 setup; read as 0, no limit, on the `lfct1.devin-enterprise-load` resource in Control Center on 2026-10-14) |
-| Load Object | `/current_load_for_gtm` (port 443, per datacenter) |
-| Liveness Test | HTTPS GET `/status`, response string: "reporting for duty" |
+| Setting            | Value                                                                                                                  |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| Property Type      | Weighted Random Load Balancing with Load Feedback                                                                      |
+| Resource Name      | load                                                                                                                   |
+| Resource Type      | Non-XML load object via HTTP                                                                                           |
+| Load Leader String | `load:`                                                                                                                |
+| Upper Bound        | 1000 (Oct 1 setup; read as 0, no limit, on the `lfct1.devin-enterprise-load` resource in Control Center on 2026-10-14) |
+| Load Object        | `/current_load_for_gtm` (port 443, per datacenter)                                                                     |
+| Liveness Test      | HTTPS GET `/status`, response string: "reporting for duty"                                                             |
 
 ### TEST 4.1: DNS Resolution Through GTM
 
@@ -227,23 +232,23 @@ GTM resolves to the geographically closest node. **PASS**
 
 Stressed node values in bold. GTM column shows which node Akamai routes traffic to.
 
-| Time | Stress | nl-ams-1 | se-sto-1 | us-lax-1 | us-ord-1 | GTM |
-|---|---|---|---|---|---|---|
-| 11:21:14 | - | 718 | 702 | 710 | 712 | us-lax-1 |
-| 11:21:31 | - | 718 | 702 | 710 | 716 | us-lax-1 |
-| 11:21:47 | nl-ams-1 | **718** | 702 | 710 | 716 | us-lax-1 |
-| 11:22:04 | nl-ams-1 | **TIMEOUT** | 698 | 720 | 716 | us-lax-1 |
-| 11:23:51 | nl-ams-1 | **725** | 696 | 714 | 707 | us-lax-1 |
-| 11:24:07 | nl-ams-1 | **1000** | 696 | 714 | 707 | us-lax-1 |
-| 11:25:30 | recovery | 707 | 705 | 722 | 721 | us-lax-1 |
-| 11:26:03 | us-lax-1 | 707 | 705 | **TIMEOUT** | 714 | us-lax-1 |
-| 11:26:45 | us-lax-1 | 707 | 698 | **TIMEOUT** | 714 | **us-ord-1** |
-| 11:28:09 | us-lax-1 | 717 | 704 | **1000** | 700 | us-ord-1 |
-| 11:29:15 | recovery | 725 | 704 | 790 | 718 | us-ord-1 |
-| 11:30:21 | us-ord-1 | 726 | 695 | 790 | **TIMEOUT** | us-ord-1 |
-| 11:32:28 | us-ord-1 | 725 | 700 | 713 | **1000** | us-ord-1 |
-| 11:33:34 | recovery | 721 | 700 | 713 | 814 | us-ord-1 |
-| 11:34:07 | recovery | 721 | 709 | 714 | 814 | **nl-ams-1** |
+| Time     | Stress   | nl-ams-1    | se-sto-1 | us-lax-1    | us-ord-1    | GTM          |
+| -------- | -------- | ----------- | -------- | ----------- | ----------- | ------------ |
+| 11:21:14 | -        | 718         | 702      | 710         | 712         | us-lax-1     |
+| 11:21:31 | -        | 718         | 702      | 710         | 716         | us-lax-1     |
+| 11:21:47 | nl-ams-1 | **718**     | 702      | 710         | 716         | us-lax-1     |
+| 11:22:04 | nl-ams-1 | **TIMEOUT** | 698      | 720         | 716         | us-lax-1     |
+| 11:23:51 | nl-ams-1 | **725**     | 696      | 714         | 707         | us-lax-1     |
+| 11:24:07 | nl-ams-1 | **1000**    | 696      | 714         | 707         | us-lax-1     |
+| 11:25:30 | recovery | 707         | 705      | 722         | 721         | us-lax-1     |
+| 11:26:03 | us-lax-1 | 707         | 705      | **TIMEOUT** | 714         | us-lax-1     |
+| 11:26:45 | us-lax-1 | 707         | 698      | **TIMEOUT** | 714         | **us-ord-1** |
+| 11:28:09 | us-lax-1 | 717         | 704      | **1000**    | 700         | us-ord-1     |
+| 11:29:15 | recovery | 725         | 704      | 790         | 718         | us-ord-1     |
+| 11:30:21 | us-ord-1 | 726         | 695      | 790         | **TIMEOUT** | us-ord-1     |
+| 11:32:28 | us-ord-1 | 725         | 700      | 713         | **1000**    | us-ord-1     |
+| 11:33:34 | recovery | 721         | 700      | 713         | 814         | us-ord-1     |
+| 11:34:07 | recovery | 721         | 709      | 714         | 814         | **nl-ams-1** |
 
 GTM shifts at 11:26:45 (us-lax-1 stressed, routes to us-ord-1) and 11:34:07 (us-ord-1 recovering, routes to nl-ams-1). **PASS**
 
@@ -251,16 +256,16 @@ GTM shifts at 11:26:45 (us-lax-1 stressed, routes to us-ord-1) and 11:34:07 (us-
 
 ## Summary
 
-| # | Test | Result |
-|---|---|---|
-| 1.1 | Status - Available (200) | PASS |
-| 1.2 | Status - Unavailable (404) | PASS |
-| 1.3 | Status - Invalid values rejected | PASS |
-| 1.4 | Status - SureRoute test object (200) | PASS |
-| 2.1 | Load - Default config (scale 1000) | PASS |
-| 2.2 | Load - Custom scale (100) | PASS |
-| 2.3 | Load - Custom max (500, capping) | PASS |
-| 3.1 | Per-node - Each node reports own utilization | PASS |
-| 3.2 | Per-node - Load differs under targeted stress | PASS |
-| 4.1 | GTM - DNS resolution through GTM | PASS |
-| 4.2 | GTM - Traffic shifts away from loaded nodes | PASS |
+| #   | Test                                          | Result |
+| --- | --------------------------------------------- | ------ |
+| 1.1 | Status - Available (200)                      | PASS   |
+| 1.2 | Status - Unavailable (404)                    | PASS   |
+| 1.3 | Status - Invalid values rejected              | PASS   |
+| 1.4 | Status - SureRoute test object (200)          | PASS   |
+| 2.1 | Load - Default config (scale 1000)            | PASS   |
+| 2.2 | Load - Custom scale (100)                     | PASS   |
+| 2.3 | Load - Custom max (500, capping)              | PASS   |
+| 3.1 | Per-node - Each node reports own utilization  | PASS   |
+| 3.2 | Per-node - Load differs under targeted stress | PASS   |
+| 4.1 | GTM - DNS resolution through GTM              | PASS   |
+| 4.2 | GTM - Traffic shifts away from loaded nodes   | PASS   |
