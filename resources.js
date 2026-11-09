@@ -176,6 +176,10 @@ function getLoad() {
  * Returns HTTP 200 when system status is "Available", 404 otherwise.
  */
 export class status extends Resource {
+	// Keep these routes off MCP and OpenAPI (Harper 5.1+): an MCP client with a super_user role would
+	// otherwise see delete_status as a tool and could take the node out of GTM rotation. REST is unaffected.
+	static hidden = true;
+
 	allowRead() {
 		return true;
 	}
@@ -206,6 +210,8 @@ export class status extends Resource {
  * Returns server load for Akamai in format "load:N", from the HTTP workers' event-loop utilization.
  */
 export class current_load_for_gtm extends Resource {
+	static hidden = true;
+
 	allowRead() {
 		return true;
 	}
