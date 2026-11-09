@@ -158,3 +158,14 @@ Default, two workers, each event loop busy 8% of the window → `load:80`
 Saturated node, every worker's event loop busy the whole window → `load:1000`
 
 Analytics not being written → `load:1000`
+
+## Releasing
+
+Releases are cut automatically from `main` by [semantic-release](https://semantic-release.gitbook.io/), which
+reads [Conventional Commits](https://www.conventionalcommits.org/) to pick the next version: `feat` is a minor,
+a `!` or `BREAKING CHANGE:` footer is a major, and every other type is a patch. It tags the release, writes
+the GitHub release notes, and commits the version back to `main`; the workflow then publishes to npm through
+trusted publishing, with provenance.
+
+Commits and PR titles are checked with commitlint, since a squash merge uses the PR title as the commit
+message semantic-release reads. To check a message locally: `echo "fix: handle empty window" | npx commitlint`.
