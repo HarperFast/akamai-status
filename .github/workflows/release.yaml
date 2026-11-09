@@ -7,10 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
-  issues: write
-  pull-requests: write
-  id-token: write
+  contents: read
 
 concurrency:
   group: Release
@@ -19,19 +16,24 @@ concurrency:
 jobs:
   release:
     name: Release
-    environment: Release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    outputs:
+      tag: ${{ steps.unpublished.outputs.tag }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: '.nvmrc'
           cache: npm
-          registry-url: 'https://registry.npmjs.org'
       - name: Install dependencies
         run: npm ci
       - name: Check format
@@ -39,18 +41,39 @@ jobs:
       - name: Run unit tests
         run: npm test
       - name: Semantic Release
-        id: semantic
-        if: ${{ github.event_name == 'push' }}
-        uses: cycjimmy/semantic-release-action@ad51787758d9654d5a75150a89a6fa9b3ccef95e # v8.1.4
+        run: npx --no semantic-release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_CONFIG_PROVENANCE: true
-      # A manual run is for a release whose publish failed: it may only publish main's tagged release commit
-      - name: Require main's HEAD to be the tagged release
-        if: ${{ github.event_name == 'workflow_dispatch' }}
+      # Gated on npm rather than on this run's release, so re-running a run whose publish failed publishes it
+      - name: Find the newest release missing from npm
+        id: unpublished
         run: |
-          test "$GITHUB_REF" = refs/heads/main
-          git tag --points-at HEAD | grep -qx "v$(node -p "require('./package.json').version")"
-      - name: Publish to NPM
-        if: ${{ steps.semantic.outputs.new_release_published == 'true' || github.event_name == 'workflow_dispatch' }}
+          tag=$(git tag --list 'v*' --sort=-version:refname | head -n 1)
+          versions=$(npm view "$(node -p "require('./package.json').name")" versions --json)
+          if ! jq -e --arg version "${tag#v}" 'index($version)' <<< "$versions" > /dev/null; then
+            echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          fi
+
+  publish:
+    name: Publish
+    needs: release
+    if: ${{ needs.release.outputs.tag != '' }}
+    environment: Release
+    runs-on: ubuntu-latest
+    # The OIDC token stays in a job that installs no dependencies, so only npm itself can use it
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout the release tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.release.outputs.tag }}
+          persist-credentials: false
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: '.nvmrc'
+          registry-url: 'https://registry.npmjs.org'
+      - name: Publish to npm
         run: npm publish --provenance
