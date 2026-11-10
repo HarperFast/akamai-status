@@ -278,8 +278,8 @@ That job publishes the newest release tag whenever npm doesn't have its version.
 Release workflow, or run it manually on `main`, before anything else merges: once a newer version is released,
 the failed one stays unpublished.
 
-semantic-release reads the squash commit. With this repo's merge settings, its title is the PR title, or the
-commit's own title for a single-commit PR, and its body holds every commit's full message: a `BREAKING CHANGE:`
-footer in any of them makes a major, and the release notes keep everything after that footer. Trim the body when
-merging. Commit messages and PR titles are checked with commitlint; to check one locally:
-`echo "fix: handle empty window" | npx commitlint`.
+semantic-release reads the commits that land on `main`. A rebase merge lands each of the PR's commits as it is,
+so each one counts, and a `BREAKING CHANGE:` footer in any of them makes a major. A squash merge lands one commit
+whose title is the PR title and whose body is blank: put a `!` in the title for a breaking change, and type a
+`BREAKING CHANGE:` paragraph into the merge dialog's body to describe it in the release notes. Commit messages
+and PR titles are checked with commitlint; to check one locally: `echo "fix: handle empty window" | npx commitlint`.
