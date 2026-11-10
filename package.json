@@ -1,6 +1,6 @@
 {
 	"name": "@harperfast/akamai-status",
-	"version": "2.0.0",
+	"version": "2.0.1",
 	"type": "module",
 	"description": "A HarperFast component providing status, load feedback, and SureRoute endpoints for Akamai services",
 	"keywords": [
